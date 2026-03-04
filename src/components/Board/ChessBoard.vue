@@ -1,4 +1,4 @@
-\<template>
+<template>
   <TheChessboard v-if="gameStore.fen" :board-config="boardConfig" :player-color="gameStore.myColor"
     @board-created="onBoardCreated" @move="onMove" />
 </template>
@@ -7,7 +7,7 @@
 import { computed, watch } from 'vue'
 import { TheChessboard, type BoardApi, type BoardConfig } from 'vue3-chessboard'
 import 'vue3-chessboard/style.css'
-import { useGameStore } from '../stores/game'
+import { useGameStore } from '../../stores/game'
 
 const gameStore = useGameStore()
 
@@ -30,9 +30,10 @@ function onBoardCreated(api: BoardApi) {
 watch(
   () => gameStore.fen,
   (fen) => {
-    if (fen && boardApi) {
-      boardApi.move(gameStore.lastMove)
-    }
+
+    if (!boardApi) return
+
+    boardApi.setPosition(fen)
   }
 )
 

@@ -2,8 +2,8 @@ import { defineStore } from 'pinia'
 import { http } from '../api/http'
 
 interface User {
-  id: number
-  username: string
+  Id: number
+  Username: string
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -21,6 +21,19 @@ export const useAuthStore = defineStore('auth', {
       this.loading = true
 
       await http.post('auth/login', {
+        email,
+        password,
+      })
+
+      await this.fetchMe()
+      this.loading = false
+    },
+
+    async register(username: string, email: string, password: string){
+      this.loading = true
+
+      await http.post('auth/register', {
+        username,
         email,
         password,
       })

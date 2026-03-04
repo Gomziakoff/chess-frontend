@@ -1,9 +1,6 @@
 <!-- components/MovesList.vue -->
 <template>
   <div class="moves-list">
-    <p>
-        {{ gameStore.steps }}
-        </p>
     <!-- Контейнер с ходами -->
     <div 
       ref="movesContainer"
@@ -88,7 +85,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { useGameStore } from '../stores/game'
+import { useGameStore } from '../../stores/game'
 
 const gameStore = useGameStore()
 const movesContainer = ref<HTMLElement | null>(null)
@@ -167,12 +164,9 @@ const goToMove = (move: any) => {
   if (!move) return
   
   console.log('Going to move:', move)
+  gameStore.goToStep(move.index)
   currentMove.value = move
   
-  // Здесь должен быть вызов для обновления доски
-  // Например, через event bus или напрямую в компонент доски
-  
-  // Прокрутка к активному ходу
   scrollToCurrentMove()
 }
 
@@ -236,6 +230,17 @@ watch(
     }
   },
   { immediate: true }
+)
+
+watch(
+  () => gameStore.currentStepIndex,
+  (newIndex, oldIndex) => {
+    console.log('Current step index changed:', newIndex, oldIndex)
+    if (newIndex !== oldIndex) {
+      currentMove.value = allMoves.value[gameStore.currentStepIndex]
+      scrollToCurrentMove()
+    }
+  }
 )
 
 // Следим за загрузкой игры

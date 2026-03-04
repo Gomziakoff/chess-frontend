@@ -35,12 +35,33 @@ export const useGameStore = defineStore("game", {
     clock: null as ClockState | null,
 
     steps: [] as any[],
+    currentStepIndex: -1,
+    liveFen: "",
 
     winner: null as string | null,
     ratingDiff: null as any,
   }),
 
   getters: {
+    currentFen(state) {
+      if (state.currentStepIndex === -1) {
+        return state.liveFen;
+      }
+
+      return state.steps[state.currentStepIndex]?.fen || state.liveFen;
+    },
+
+    hasPrevious(state) {
+      return state.currentStepIndex > 0;
+    },
+
+    hasNext(state) {
+      return state.currentStepIndex < state.steps.length - 1;
+    },
+
+    isLive(state) {
+      return state.currentStepIndex === -1;
+    },
     isMyTurn(state) {
       if (!state.fen || !state.myColor) return false;
 
@@ -90,7 +111,13 @@ export const useGameStore = defineStore("game", {
         color: "black",
       };
 
-      this.steps = data.Steps;
+      this.steps = Array.isArray(data.Steps)
+    ? data.Steps
+    : []
+      this.liveFen = this.fen;
+
+      this.currentStepIndex =
+        this.steps.length > 0 ? this.steps.length - 1 : -1;
 
       this.myColor = data.Orientation?.toLowerCase() ?? null;
     },
@@ -146,6 +173,8 @@ export const useGameStore = defineStore("game", {
         console.warn("steps was not an array, resetting to empty array");
         this.steps = [];
       }
+      this.liveFen = data.fen;
+      this.currentStepIndex = this.steps.length;
 
       this.steps.push({
         ply: data.ply,
@@ -153,6 +182,48 @@ export const useGameStore = defineStore("game", {
         san: data.san,
         fen: data.fen,
       });
+    },
+    goToStep(index: number) {
+      if (index < 0) {
+        this.currentStepIndex = -1;
+        this.fen = this.liveFen;
+        return;
+      }
+
+      if (index >= this.steps.length) return;
+
+      this.currentStepIndex = index;
+      this.fen = this.steps[index].fen;
+    },
+
+    goToFirst() {
+      if (this.steps.length === 0) return;
+
+      this.currentStepIndex = 0;
+      this.fen = this.steps[0].fen;
+    },
+
+    goToLast() {
+      this.currentStepIndex = this.steps.length - 1;
+      this.fen = this.liveFen;
+    },
+
+    goToNext() {
+      if (this.currentStepIndex === -1) return;
+
+      if (this.currentStepIndex < this.steps.length - 1) {
+        this.currentStepIndex++;
+
+        this.fen = this.steps[this.currentStepIndex].fen;
+      }
+    },
+
+    goToPrevious() {
+      if (this.currentStepIndex <= 0) return;
+
+      this.currentStepIndex--;
+
+      this.fen = this.steps[this.currentStepIndex].fen;
     },
 
     applyEnd(data: any) {

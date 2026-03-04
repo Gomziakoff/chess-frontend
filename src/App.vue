@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useAuthStore } from './stores/auth'
+import Header from './components/Header.vue'
+
 
 const auth = useAuthStore()
 
@@ -10,5 +12,16 @@ onMounted(() => {
 </script>
 
 <template>
+  <Header />
+
+  <div class="layout">
     <router-view />
+  </div>
 </template>
+
+<style>
+.layout {
+  display: flex;
+  justify-content: center;
+}
+</style>

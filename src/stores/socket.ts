@@ -9,6 +9,7 @@ export const useSocketStore = defineStore("socket", {
     mode: null as WSMode | null,
     connected: false,
     reconnectTimer: null as number | null,
+    pingTimer: null as number | null,
     currentGameId: null as number | null,
     shouldReconnect: true,
     lobbyCallbacks: {} as Record<string, ((payload: any) => void)[]>,
@@ -40,6 +41,9 @@ export const useSocketStore = defineStore("socket", {
       ws.onopen = () => {
         console.log("WS connected:", mode);
         this.connected = true;
+
+        this.send({t: "ping"});
+        this.startPing();
       };
 
       ws.onclose = () => {
@@ -64,6 +68,7 @@ export const useSocketStore = defineStore("socket", {
 
     disconnect() {
       this.shouldReconnect = false;
+      this.stopPing();
       if (this.socket) {
         this.socket.close();
         this.socket = null;
@@ -72,6 +77,24 @@ export const useSocketStore = defineStore("socket", {
       if (this.reconnectTimer) {
         clearTimeout(this.reconnectTimer);
         this.reconnectTimer = null;
+      }
+    },
+
+    startPing() {
+      this.stopPing();
+
+      this.pingTimer = window.setInterval(() => {
+        if (this.socket?.readyState === WebSocket.OPEN) {
+          this.send({t: "ping"}); // ← отправка null
+          // или this.socket.send(JSON.stringify(null));
+        }
+      }, 3000);
+    },
+
+    stopPing() {
+      if (this.pingTimer) {
+        clearInterval(this.pingTimer);
+        this.pingTimer = null;
       }
     },
 

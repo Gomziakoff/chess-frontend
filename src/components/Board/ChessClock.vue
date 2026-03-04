@@ -14,7 +14,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { useGameStore } from '../stores/game'
+import { useGameStore } from '../../stores/game'
 
 interface Props {
   color: 'white' | 'black'
@@ -31,9 +31,9 @@ const tickInterval = 50 // обновление каждые 50 мс
 
 // Активные часы (ход этого цвета)
 const isActive = computed(() => {
-  if (!gameStore.clock || !gameStore.fen) return false
+  if (!gameStore.clock || !gameStore.liveFen) return false
   return (
-    gameStore.fen.split(' ')[1] === (props.color === 'white' ? 'w' : 'b') &&
+    gameStore.liveFen.split(' ')[1] === (props.color === 'white' ? 'w' : 'b') &&
     gameStore.clock.running
   )
 })
