@@ -8,7 +8,9 @@
 
     <!-- Центр: шахматная доска -->
     <div class="center-panel">
-      <ChessBoard />
+      <ChessBoard :fen="gameStore.fen" :orientation="gameStore.orientation" :allow-moves="gameStore.isMyTurn"
+      :player-color="gameStore.myColor"  
+      @move="gameStore.sendMove" />
     </div>
 
     <!-- Правая колонка: часы и геймпанель -->
@@ -104,18 +106,21 @@ const opponentColor = computed(() => {
 /* Адаптив для экранов <= 1024px */
 @media (max-width: 1024px) {
   .game-layout {
-    flex-direction: row; /* доска слева, панель справа */
+    flex-direction: row;
+    /* доска слева, панель справа */
     align-items: flex-start;
     justify-content: center;
   }
 
   .left-panel {
-    display: none; /* скрываем слева */
+    display: none;
+    /* скрываем слева */
   }
 
   .center-panel {
     flex: 0 0 auto;
-    max-width: 50%; /* доска уменьшена */
+    max-width: 50%;
+    /* доска уменьшена */
   }
 
   .right-panel {
@@ -132,7 +137,8 @@ const opponentColor = computed(() => {
 /* Адаптив для ещё меньших экранов <= 640px */
 @media (max-width: 640px) {
   .game-layout {
-    flex-direction: column; /* доска сверху, панель под ней */
+    flex-direction: column;
+    /* доска сверху, панель под ней */
     align-items: center;
   }
 

@@ -27,6 +27,7 @@ export const useGameStore = defineStore("game", {
     turns: 0,
     lastMove: "" as string,
 
+    orientation: undefined as "white" | "black" | undefined,
     myColor: undefined as "white" | "black" | undefined,
 
     whitePlayer: undefined as PlayerInfo | undefined,
@@ -70,10 +71,6 @@ export const useGameStore = defineStore("game", {
         (turn === "w" && state.myColor === "white") ||
         (turn === "b" && state.myColor === "black")
       );
-    },
-
-    orientation(state) {
-      return state.myColor ?? "white";
     },
 
     isFinished(state) {
@@ -120,6 +117,7 @@ export const useGameStore = defineStore("game", {
         this.steps.length > 0 ? this.steps.length - 1 : -1;
 
       this.myColor = data.Orientation?.toLowerCase() ?? null;
+      this.orientation = data.Orientation?.toLowerCase() ?? null;
     },
 
     getLastStepFen(data: any) {
@@ -246,6 +244,7 @@ export const useGameStore = defineStore("game", {
       this.turns = 0;
       this.lastMove = "";
       this.myColor = undefined;
+      this.orientation = undefined;
       this.whitePlayer = undefined;
       this.blackPlayer = undefined;
       this.clock = null;

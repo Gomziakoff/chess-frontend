@@ -46,8 +46,8 @@ const game = useGameStore()
 
 function flip() {
 
-  game.myColor =
-    game.myColor === 'white'
+  game.orientation =
+    game.orientation === 'white'
       ? 'black'
       : 'white'
 }

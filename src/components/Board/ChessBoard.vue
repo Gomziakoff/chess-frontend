@@ -1,45 +1,76 @@
 <template>
-  <TheChessboard v-if="gameStore.fen" :board-config="boardConfig" :player-color="gameStore.myColor"
-    @board-created="onBoardCreated" @move="onMove" />
+  <TheChessboard
+    v-if="fen"
+    :board-config="boardConfig"
+    :player-color="props.playerColor"
+    @board-created="onBoardCreated"
+    @move="handleMove"
+  />
 </template>
 
 <script setup lang="ts">
 import { computed, watch } from 'vue'
-import { TheChessboard, type BoardApi, type BoardConfig } from 'vue3-chessboard'
+import {
+  TheChessboard,
+  type BoardApi,
+  type BoardConfig,
+} from 'vue3-chessboard'
 import 'vue3-chessboard/style.css'
-import { useGameStore } from '../../stores/game'
 
-const gameStore = useGameStore()
+interface Props {
+  fen: string
+  orientation?: 'white' | 'black'
+  playerColor?: 'white' | 'black'
+  coordinates?: boolean
+  allowMoves?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  orientation: 'white',
+  coordinates: true,
+  allowMoves: true,
+})
+
+const emit = defineEmits<{
+  (e: 'move', move: string): void
+  (e: 'board-created', api: BoardApi): void
+}>()
 
 let boardApi: BoardApi | null = null
 
 const boardConfig = computed<BoardConfig>(() => ({
-  coordinates: true,
-  orientation: gameStore.myColor ?? 'white',
+  coordinates: props.coordinates,
+  orientation: props.orientation,
 }))
 
 function onBoardCreated(api: BoardApi) {
   boardApi = api
+  emit('board-created', api)
 
-  // установить начальную позицию
-  if (gameStore.fen) {
-    boardApi.setPosition(gameStore.fen)
+  if (props.fen) {
+    boardApi.setPosition(props.fen)
   }
 }
 
 watch(
-  () => gameStore.fen,
+  () => props.fen,
   (fen) => {
-
     if (!boardApi) return
-
     boardApi.setPosition(fen)
   }
 )
 
-function onMove(move: any) {
-  if (gameStore.isMyTurn) {
-    gameStore.sendMove(move.lan)
+watch(
+  () => props.orientation,
+  () => {
+    if (!boardApi) return
+    // Используем метод API для смены ориентации
+    boardApi.toggleOrientation()
   }
+)
+
+function handleMove(move: any) {
+  if (!props.allowMoves) return
+  emit('move', move.lan)
 }
 </script>
