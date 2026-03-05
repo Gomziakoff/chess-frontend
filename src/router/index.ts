@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+import Main from '../views/Main.vue'
 import Lobby from '../views/Lobby.vue'
 import Game from '../views/Game.vue'
 import Watch from '../views/Watch.vue'
@@ -9,8 +10,8 @@ import { useAuthStore } from '../stores/auth'
 const routes = [
   {
     path: '/',
-    name: 'Lobby',
-    component: Lobby,
+    name: 'Main',
+    component: Main,
   },
   {
     path: '/game/:id',

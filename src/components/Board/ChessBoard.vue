@@ -41,6 +41,8 @@ let boardApi: BoardApi | null = null
 const boardConfig = computed<BoardConfig>(() => ({
   coordinates: props.coordinates,
   orientation: props.orientation,
+  highlight: {lastMove:false},
+  fen: props.fen,
 }))
 
 function onBoardCreated(api: BoardApi) {
@@ -64,7 +66,6 @@ watch(
   () => props.orientation,
   () => {
     if (!boardApi) return
-    // Используем метод API для смены ориентации
     boardApi.toggleOrientation()
   }
 )

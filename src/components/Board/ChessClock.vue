@@ -1,111 +1,117 @@
 <template>
   <div
     class="clock-container"
-    :class="{ active: isActive, danger: clockValue <= dangerThreshold }"
+    :class="{ active, danger: displayTime <= dangerThreshold }"
   >
     <div class="player-name">
       {{ playerSymbol }} {{ playerName }}
     </div>
+
     <div class="time-display">
-      {{ minutes }}:{{ secondsPadded }}<span v-if="showTenths">.{{ tenths }}</span>
+      {{ minutes }}:{{ secondsPadded }}
+      <span v-if="showTenths">.{{ tenths }}</span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { useGameStore } from '../../stores/game'
+import { ref, computed, watch,  onUnmounted } from 'vue'
 
 interface Props {
+  time: number // milliseconds
+  active: boolean
   color: 'white' | 'black'
+  playerName?: string
+  dangerThreshold?: number
 }
-const props = defineProps<Props>()
-const gameStore = useGameStore()
 
-// Текущее серверное время в мс
-const baseTime = ref(0)
-// Момент последнего обновления для отсчета тика
+const props = withDefaults(defineProps<Props>(), {
+  playerName: '',
+  dangerThreshold: 10000,
+  time: 0,
+})
+
+const emit = defineEmits<{
+  (e: 'time-expired'): void
+}>()
+
+/* ---------- INTERNAL STATE ---------- */
+
+const baseTime = ref(props.time)
 const referenceTime = ref(Date.now())
 let interval: number | null = null
-const tickInterval = 50 // обновление каждые 50 мс
+const tickInterval = 50
 
-// Активные часы (ход этого цвета)
-const isActive = computed(() => {
-  if (!gameStore.clock || !gameStore.liveFen) return false
-  return (
-    gameStore.liveFen.split(' ')[1] === (props.color === 'white' ? 'w' : 'b') &&
-    gameStore.clock.running
-  )
-})
+/* ---------- COMPUTED ---------- */
 
-// Текущее отображаемое время
-const clockValue = computed(() => Math.max(baseTime.value, 0))
+const displayTime = computed(() => Math.max(baseTime.value, 0))
 
-// Таймер в минуты, секунды и десятые
-const minutes = computed(() => Math.floor(clockValue.value / 60000))
-const seconds = computed(() => Math.floor(clockValue.value / 1000) % 60)
+const minutes = computed(() => Math.floor(displayTime.value / 60000))
+const seconds = computed(() => Math.floor(displayTime.value / 1000) % 60)
 const secondsPadded = computed(() => ('00' + seconds.value).slice(-2))
-const tenths = computed(() => Math.floor((clockValue.value % 1000) / 100))
+const tenths = computed(() => Math.floor((displayTime.value % 1000) / 100))
 const showTenths = computed(() => minutes.value < 1 && seconds.value <= 20)
 
-const playerSymbol = computed(() => (props.color === 'white' ? '○' : '●'))
-const playerName = computed(() => {
-  if (!gameStore.whitePlayer || !gameStore.blackPlayer) return ''
-  return props.color === 'white'
-    ? gameStore.whitePlayer.username
-    : gameStore.blackPlayer.username
-})
+const playerSymbol = computed(() =>
+  props.color === 'white' ? '●' : '○'
+)
 
-// Красный фон при опасном времени
-const dangerThreshold = 10000 // 10 секунд
+/* ---------- TIMER LOGIC ---------- */
 
-// Функция запуска интервала для плавного тика
-const startInterval = () => {
+function startInterval() {
   if (interval !== null) clearInterval(interval)
+
   interval = window.setInterval(() => {
-    if (isActive.value) {
-      const now = Date.now()
-      const elapsed = now - referenceTime.value
-      referenceTime.value = now
-      baseTime.value = Math.max(baseTime.value - elapsed, 0)
+    if (!props.active) return
+
+    const now = Date.now()
+    const elapsed = now - referenceTime.value
+    referenceTime.value = now
+
+    baseTime.value = Math.max(baseTime.value - elapsed, 0)
+
+    if (baseTime.value <= 0) {
+      emit('time-expired')
+      stopInterval()
     }
   }, tickInterval)
 }
 
-// Следим за активностью — перезапуск интервала
-watch(isActive, (active) => {
-  if (active) {
-    referenceTime.value = Date.now()
-    startInterval()
-  } else if (interval !== null) {
+function stopInterval() {
+  if (interval !== null) {
     clearInterval(interval)
     interval = null
   }
-})
+}
 
-// Синхронизация с сервером
+/* ---------- WATCHERS ---------- */
+
+// Синхронизация с родителем
 watch(
-  () => gameStore.clock && { white: gameStore.clock.white, black: gameStore.clock.black },
-  (newClock) => {
-    if (!newClock) return
-    const serverTime = props.color === 'white' ? newClock.white * 1000 : newClock.black * 1000
-    if (serverTime !== baseTime.value) {
-      baseTime.value = serverTime
-      referenceTime.value = Date.now()
-    }
+  () => props.time,
+  (newTime) => {
+    baseTime.value = newTime
+    referenceTime.value = Date.now()
   },
-  { deep: true, immediate: true }
+  { immediate: true }
 )
 
-onMounted(() => {
-  if (isActive.value) startInterval()
-})
+// Старт / стоп
+watch(
+  () => props.active,
+  (isActive) => {
+    if (isActive) {
+      referenceTime.value = Date.now()
+      startInterval()
+    } else {
+      stopInterval()
+    }
+  },
+  { immediate: true }
+)
 
-onUnmounted(() => {
-  if (interval !== null) clearInterval(interval)
-})
+onUnmounted(stopInterval)
 </script>
-
 <style scoped>
 .clock-container {
   display: flex;

@@ -9,21 +9,22 @@
     <!-- Центр: шахматная доска -->
     <div class="center-panel">
       <ChessBoard :fen="gameStore.fen" :orientation="gameStore.orientation" :allow-moves="gameStore.isMyTurn"
-      :player-color="gameStore.myColor"  
-      @move="gameStore.sendMove" />
+        :player-color="gameStore.myColor" @move="gameStore.sendMove" />
     </div>
 
     <!-- Правая колонка: часы и геймпанель -->
     <div class="right-panel">
-      <ChessClock v-if="gameStore.clock && gameStore.fen" :color="opponentColor" />
+      <ChessClock :time="opponentTime" :active="opponentActive"
+        :color="opponentColor" :player-name="opponentName" />
       <GamePanel />
-      <ChessClock v-if="gameStore.clock && gameStore.fen" :color="gameStore.myColor || 'white'" />
+      <ChessClock :time="myTime" :active="myActive"
+        :color="gameStore.myColor || 'white'" :player-name="myName" />
     </div>
-  </div>
 
-  <!-- Нижняя заглушка для мобильного -->
-  <div class="bottom-panel">
-    <div class="player-card">Players info / placeholder</div>
+    <!-- Нижняя заглушка для мобильного -->
+    <div class="bottom-panel">
+      <div class="player-card">Players info / placeholder</div>
+    </div>
   </div>
 </template>
 
@@ -48,9 +49,50 @@ onMounted(async () => {
   socketStore.connect('game', Number(gameId))
 })
 
+const myTime = computed(() => {
+  if (!gameStore.clock || !gameStore.myColor) return 0
+  return gameStore.myColor === 'white' 
+    ? gameStore.clock.white * 1000 
+    : gameStore.clock.black * 1000
+})
+
+const opponentTime = computed(() => {
+  if (!gameStore.clock || !gameStore.myColor) return 0
+  return gameStore.myColor === 'white'
+    ? gameStore.clock.black * 1000
+    : gameStore.clock.white * 1000
+})
+const myActive = computed(() => {
+  if (!gameStore.clock?.running || !gameStore.liveFen || !gameStore.myColor) return false
+  
+  const currentTurn = gameStore.liveFen.includes(' w ') ? 'white' : 'black'
+  return gameStore.myColor === currentTurn
+})
+
+const opponentActive = computed(() => {
+  if (!gameStore.clock?.running || !gameStore.liveFen || !gameStore.myColor) return false
+  
+  const currentTurn = gameStore.liveFen.includes(' w ') ? 'white' : 'black'
+  return gameStore.myColor !== currentTurn
+})
+
 const opponentColor = computed(() => {
   if (!gameStore.myColor) return 'white'
   return gameStore.myColor === 'white' ? 'black' : 'white'
+})
+
+const myName = computed(() => {
+  if (!gameStore.myColor) return ''
+  return gameStore.myColor === 'white' 
+    ? gameStore.whitePlayer?.username 
+    : gameStore.blackPlayer?.username
+})
+
+const opponentName = computed(() => {
+  if (!gameStore.myColor) return ''
+  return gameStore.myColor === 'white'
+    ? gameStore.blackPlayer?.username
+    : gameStore.whitePlayer?.username
 })
 </script>
 

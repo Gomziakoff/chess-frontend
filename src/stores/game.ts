@@ -108,9 +108,7 @@ export const useGameStore = defineStore("game", {
         color: "black",
       };
 
-      this.steps = Array.isArray(data.Steps)
-    ? data.Steps
-    : []
+      this.steps = Array.isArray(data.Steps) ? data.Steps : [];
       this.liveFen = this.fen;
 
       this.currentStepIndex =
@@ -142,6 +140,16 @@ export const useGameStore = defineStore("game", {
           u: uci,
           a: this.turns + 1,
         },
+      });
+    },
+
+    sendResign() {
+      if (this.status === "finished") return;
+
+      const socket = useSocketStore();
+
+      socket.send({
+        t: "resign",
       });
     },
 
@@ -224,10 +232,14 @@ export const useGameStore = defineStore("game", {
       this.fen = this.steps[this.currentStepIndex].fen;
     },
 
+    flipBoard() {
+      this.orientation = this.orientation === "white" ? "black" : "white";
+    },
+
     applyEnd(data: any) {
       this.status = "finished";
-      this.winner = data.Winner;
-      this.ratingDiff = data.RatingDiff;
+      this.winner = data.winner;
+      this.ratingDiff = data.ratingDiff;
 
       if (this.clock) {
         this.clock.running = false;
