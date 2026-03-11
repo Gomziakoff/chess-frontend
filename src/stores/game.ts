@@ -116,6 +116,7 @@ export const useGameStore = defineStore("game", {
 
       this.myColor = data.Orientation?.toLowerCase() ?? null;
       this.orientation = data.Orientation?.toLowerCase() ?? null;
+      this.winner = data.Game.winner
     },
 
     getLastStepFen(data: any) {

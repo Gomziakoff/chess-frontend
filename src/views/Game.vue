@@ -1,5 +1,5 @@
 <template>
-  <div class="game-layout">
+  <div class="game-layout" :key="$route.fullPath">
     <!-- Левая колонка (карточки игроков / заглушка) -->
     <div class="left-panel">
       <div class="player-card">White Player</div>
@@ -23,13 +23,13 @@
 
     <!-- Нижняя заглушка для мобильного -->
     <div class="bottom-panel">
-      <div class="player-card">Players info / placeholder</div>
+      <div class="player-card">Players info / placeholder </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
+import { onMounted,onUnmounted, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useGameStore } from '../stores/game'
 import { useSocketStore } from '../stores/socket'
@@ -42,11 +42,19 @@ const route = useRoute()
 const gameStore = useGameStore()
 const socketStore = useSocketStore()
 
-const gameId = route.params.id
+async function loadGameById(id: number) {
+  socketStore.disconnect()
+  await gameStore.reset()      // если есть reset — идеально
+  await gameStore.loadGame(id)
+  socketStore.connect('game', id)
+}
 
 onMounted(async () => {
-  await gameStore.loadGame(Number(gameId))
-  socketStore.connect('game', Number(gameId))
+  loadGameById(Number(route.params.id))
+})
+
+onUnmounted(async () =>{
+  gameStore.reset()
 })
 
 const myTime = computed(() => {
@@ -94,6 +102,14 @@ const opponentName = computed(() => {
     ? gameStore.blackPlayer?.username
     : gameStore.whitePlayer?.username
 })
+
+watch(
+  () => route.params.id,
+  (newId) => {
+    if (!newId) return
+    loadGameById(Number(newId))
+  }
+)
 </script>
 
 <style scoped>

@@ -154,7 +154,7 @@ const movePairs = computed(() => {
 /* ---------- RESULT ---------- */
 
 const gameResult = computed(() => {
-  if (props.status !== 'finished') return null
+  if (props.status === 'active') return null
   if (props.winner === 'White') return '1-0'
   if (props.winner === 'Black') return '0-1'
   return '½-½'

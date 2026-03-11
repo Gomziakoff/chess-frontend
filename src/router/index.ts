@@ -14,6 +14,11 @@ const routes = [
     component: Main,
   },
   {
+    path: '/lobby',
+    name: 'Lobby',
+    component: Lobby,
+  },
+  {
     path: '/game/:id',
     name: 'Game',
     component: Game,

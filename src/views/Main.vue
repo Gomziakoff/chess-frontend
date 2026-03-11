@@ -8,10 +8,10 @@
 
     <!-- Нижняя часть: кнопки 2x3 -->
     <div class="buttons-section">
-      <router-link to="/game" class="glass-button">
+      <button @click="openGameModal" class="glass-button">
         <span class="icon">♟️</span>
         <span class="label">ИГРА</span>
-      </router-link>
+      </button>
       <router-link to="/analysis" class="glass-button">
         <span class="icon">🔍</span>
         <span class="label">АНАЛИЗ</span>
@@ -33,8 +33,20 @@
         <span class="label">БОТ/НЕ БОТ</span>
       </router-link>
     </div>
+    <StartGameModal v-if="showModal" @close="showModal = false" />
   </div>
 </template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+import StartGameModal from '../components/StartGameModal.vue';
+
+const showModal = ref(false)
+
+function openGameModal() {
+  showModal.value = true
+}
+</script>
 
 <style scoped>
 .container {

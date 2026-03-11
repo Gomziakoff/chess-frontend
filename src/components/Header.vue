@@ -7,7 +7,9 @@
             </router-link>
 
             <nav class="nav">
-                <a href="#" class="nav-link active">ИГРА</a>
+                <button class="nav-link active" @click="openGameModal">
+                    ИГРА
+                </button>
                 <a href="#" class="nav-link">ЗАДАЧИ</a>
                 <a href="#" class="nav-link">ДЕБЮТЫ</a>
                 <a href="#" class="nav-link">ПРОСМОТР</a>
@@ -19,22 +21,14 @@
         <!-- Правая часть -->
         <div class="header-right" ref="menuRef">
             <!-- если НЕ залогинен -->
-            <a
-                v-if="!authStore.isAuthenticated"
-                href="/login"
-                class="nav-link"
-            >
+            <a v-if="!authStore.isAuthenticated" href="/login" class="nav-link">
                 ВХОД
             </a>
 
             <!-- если залогинен -->
-            <div
-                v-else
-                class="user-wrapper"
-                @click="toggleMenu"
-            >
+            <div v-else class="user-wrapper" @click="toggleMenu">
                 <div class="username">
-                    {{ authStore.user?.Username}}
+                    {{ authStore.user?.Username }}
                     <span class="arrow">▾</span>
                 </div>
 
@@ -48,19 +42,27 @@
             </div>
         </div>
     </header>
+    <start-game-modal v-if="showModal" @close="showModal = false" />
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
+import StartGameModal from './StartGameModal.vue'
 import { useAuthStore } from '../stores/auth'
+
 
 const authStore = useAuthStore()
 
+const showModal = ref(false)
 const menuOpen = ref(false)
 const menuRef = ref<HTMLElement | null>(null)
 
 function toggleMenu() {
     menuOpen.value = !menuOpen.value
+}
+
+function openGameModal() {
+    showModal.value = true
 }
 
 async function logout() {
@@ -96,7 +98,8 @@ onBeforeUnmount(() => {
     justify-content: space-between;
     padding: 0 16px;
     font-family: 'Alumni Sans', system-ui, Avenir, Helvetica, Arial, sans-serif;
-    position: relative; /* Добавлено для контекста позиционирования */
+    position: relative;
+    /* Добавлено для контекста позиционирования */
 }
 
 /* Левая часть */
@@ -125,6 +128,13 @@ onBeforeUnmount(() => {
 }
 
 /* Навигация */
+button.nav-link {
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+
 .nav {
     display: flex;
     gap: 18px;
@@ -156,7 +166,8 @@ onBeforeUnmount(() => {
 
 /* Правая часть - новый стиль */
 .header-right {
-    position: relative; /* Важно для позиционирования дропдауна */
+    position: relative;
+    /* Важно для позиционирования дропдауна */
     padding-right: 2rem;
 }
 
@@ -188,8 +199,10 @@ onBeforeUnmount(() => {
 /* Стили для выпадающего меню */
 .dropdown {
     position: absolute;
-    top: 100%; /* Располагается сразу под username */
-    right: 0; /* Выравнивание по правому краю */
+    top: 100%;
+    /* Располагается сразу под username */
+    right: 0;
+    /* Выравнивание по правому краю */
     margin-top: 8px;
     background: #2a1a33;
     border: 1px solid #3a2a43;

@@ -114,7 +114,6 @@ const submit = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at center top, #2C1B48, #0B0004);
 }
 
 .auth-box {
