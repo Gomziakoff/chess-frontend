@@ -1,105 +1,224 @@
 <template>
-  <div class="analysis-page">
-    <div class="board-area">
-      <EvalBar 
-        :score="analysisStore.evalScore" 
-        :mate="analysisStore.mate"
-        :orientation="gameStore.orientation || 'white'"
-      />
-      <div class="board-wrapper">
+  <div class="analysis-layout">
+    <!-- ЛЕВАЯ ПАНЕЛЬ: Оценка -->
+    <div class="left-panel">
+      <div class="eval-wrapper">
+        <EvalBar 
+          :score="analysisStore.evalScore" 
+          :mate="analysisStore.mate"
+          :orientation="analysisStore.orientation"
+        />
+      </div>
+    </div>
+
+    <!-- ЦЕНТРАЛЬНАЯ ПАНЕЛЬ: Доска -->
+    <div class="center-panel">
+      <div class="board-container">
         <ChessBoard 
-          :fen="gameStore.currentFen" 
-          :orientation="gameStore.orientation"
+          :fen="analysisStore.currentFen" 
+          :orientation="analysisStore.orientation"
+          :engine-move="analysisStore.bestMove"
+          :next-history-move="nextMoveInHistory"
           @move="onUserMove"
         />
       </div>
     </div>
 
-    <div class="side-panel">
-      <EngineOutput />
-      <GamePanel /> <!-- Ваш существующий GamePanel -->
+    <!-- ПРАВАЯ ПАНЕЛЬ: Инструменты анализа -->
+    <div class="right-panel">
+      <!-- Блок движка -->
+      <div class="engine-section">
+        <EngineOutput 
+    :lines="analysisStore.engineLines"
+    :is-thinking="analysisStore.isThinking"
+    :depth="analysisStore.depth"
+  />
+        <div class="engine-footer">
+          <button 
+            class="toggle-analysis-btn" 
+            :class="{ is_thinking: analysisStore.isThinking }"
+            @click="toggleAnalysis"
+          >
+            {{ analysisStore.isThinking ? 'Stop Engine' : 'Cloud Analysis' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Список ходов -->
+      <div class="moves-section">
+        <MovesList 
+          :moves="analysisStore.history" 
+          :currentIndex="analysisStore.currentStepIndex"
+          @select="analysisStore.goToStep"
+          @prev="analysisStore.prevMove"
+          @next="analysisStore.nextMove"
+        />
+      </div>
       
-      <div class="controls">
-        <button @click="toggleAnalysis">
-          {{ analysisStore.isThinking ? 'Выключить анализ' : 'Включить анализ' }}
-        </button>
+      <!-- Ваш контроллер доски -->
+      <div class="controller-section">
+        <BoardController 
+          :has-previous="analysisStore.currentStepIndex > -1"
+          :has-next="analysisStore.currentStepIndex < analysisStore.history.length - 1"
+          @first="analysisStore.goToStep(-1)"
+          @prev="analysisStore.prevMove"
+          @next="analysisStore.nextMove"
+          @last="analysisStore.goToStep(analysisStore.history.length - 1)"
+          @flip="analysisStore.orientation = analysisStore.orientation === 'white' ? 'black' : 'white'"
+          @resign="onResignClick"
+        />
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, watch } from 'vue';
+import { onMounted, computed } from 'vue';
 import ChessBoard from '../components/Board/ChessBoard.vue';
 import EvalBar from '../components/Analysis/EvalBar.vue';
 import EngineOutput from '../components/Analysis/EngineOutput.vue';
-import GamePanel from '../components/Board/GamePanel.vue';
-import { useGameStore } from '../stores/game';
+import MovesList from '../components/Board/MovesList.vue';
+import BoardController from '../components/Board/BoardController.vue'; // Импорт контроллера
 import { useAnalysisStore } from '../stores/analysis';
 
-const gameStore = useGameStore();
-gameStore.loadGame(78)
 const analysisStore = useAnalysisStore();
+
+// Логика стрелки "хода из истории"
+const nextMoveInHistory = computed(() => {
+  const nextStep = analysisStore.history[analysisStore.currentStepIndex + 1];
+  return nextStep ? nextStep.uci : null;
+});
+
+function onUserMove(uci: string) {
+  analysisStore.makeMove(uci);
+}
 
 function toggleAnalysis() {
   if (analysisStore.isThinking) {
     analysisStore.stopAnalysis();
   } else {
-    analysisStore.analyzeFen(gameStore.currentFen);
+    analysisStore.analyzeFen(analysisStore.currentFen);
   }
 }
 
-// Следим за изменением позиции (ход или навигация по стрелкам)
-watch(() => gameStore.currentFen, (newFen) => {
-  if (analysisStore.isThinking || !analysisStore.isReady) {
-    analysisStore.analyzeFen(newFen);
+function onResignClick() {
+  // В режиме анализа кнопка Resign может очищать доску или просто ничего не делать
+  if (confirm('Очистить анализ и начать заново?')) {
+    analysisStore.initNewGame();
   }
-});
-
-function onUserMove(uci: string) {
-  // Логика добавления хода в стор игры для анализа
-  // В режиме анализа мы не отправляем ходы на сервер, а просто двигаем позицию локально
 }
 
 onMounted(() => {
+  analysisStore.initNewGame();
   analysisStore.initEngine();
 });
 </script>
 
 <style scoped>
-.analysis-page {
+.analysis-layout {
   display: flex;
-  height: 90vh;
-  gap: 20px;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 16px;
   padding: 20px;
-  background: #161512;
+  max-width: 1400px;
+  margin: 0 auto;
+  height: calc(100vh - 100px);
+  box-sizing: border-box;
 }
-.board-area {
-  display: flex;
-  gap: 10px;
-  flex: 2;
+
+/* EvalBar слева */
+.left-panel {
+  width: 35px;
+  height: 600px; /* Фиксируем под размер доски */
 }
-.board-wrapper {
-  flex: 1;
-  max-width: 700px;
+.eval-wrapper {
+  height: 100%;
 }
-.side-panel {
-  flex: 1;
+
+/* Доска в центре */
+.center-panel {
+  flex: 0 1 600px;
+}
+.board-container {
+  width: 100%;
+  aspect-ratio: 1/1;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+
+/* Правая колонка */
+.right-panel {
+  width: 380px;
+  height: 600px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
-.controls {
-  padding: 10px;
+
+.engine-section {
   background: #262421;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #333;
 }
-button {
+
+.engine-footer {
+  padding: 8px;
+  background: #2a2825;
+}
+
+.toggle-analysis-btn {
   width: 100%;
-  padding: 10px;
-  background: #4a6fa5;
-  color: white;
-  border: none;
+  padding: 6px;
+  background: #3c3934;
+  color: #bababa;
+  border: 1px solid #45423e;
   border-radius: 4px;
   cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.toggle-analysis-btn.is_thinking {
+  background: #4a6fa5;
+  color: white;
+  border-color: #5d82b8;
+}
+
+.moves-section {
+  flex: 1;
+  background: #262421;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #333;
+}
+
+/* Секция с кнопками контроллера */
+.controller-section {
+  background: #262421;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #333;
+}
+
+/* Скрываем кнопку resign в контроллере (опционально) */
+:deep(.controller button:last-child) {
+  display: none; 
+}
+
+/* Адаптив */
+@media (max-width: 1024px) {
+  .analysis-layout {
+    flex-direction: column;
+    align-items: center;
+    height: auto;
+  }
+  .left-panel {
+    display: none; /* Или можно сделать горизонтальным над доской */
+  }
+  .right-panel {
+    width: 100%;
+    max-width: 600px;
+  }
 }
 </style>

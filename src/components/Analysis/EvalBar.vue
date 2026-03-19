@@ -1,7 +1,15 @@
 <template>
-  <div class="eval-bar-container">
-    <div class="eval-bar-fill" :style="barStyle">
-      <span class="eval-text" :class="{ 'text-black': isWhiteAdvantage }">
+  <div class="eval-bar-container" :class="orientation">
+    <!-- Белая заливка (преимущество белых) -->
+    <div class="white-fill" :style="whiteStyle">
+      <span v-if="isWhiteLeading" class="score-text text-black">
+        {{ displayScore }}
+      </span>
+    </div>
+
+    <!-- Текст для черных (когда белая плашка слишком мала) -->
+    <div v-if="!isWhiteLeading" class="black-area-text">
+      <span class="score-text text-white">
         {{ displayScore }}
       </span>
     </div>
@@ -12,61 +20,81 @@
 import { computed } from 'vue';
 
 const props = defineProps<{
-  score: number;
-  mate: number | null;
+  score: number;        // Плюс = белые, Минус = черные
+  mate: number | null;  // Плюс = белые, Минус = черные
   orientation: 'white' | 'black';
 }>();
 
-const isWhiteAdvantage = computed(() => props.score >= 0);
+const isWhiteLeading = computed(() => (props.mate !== null ? props.mate > 0 : props.score > 0));
 
 const displayScore = computed(() => {
   if (props.mate !== null) return `M${Math.abs(props.mate)}`;
   return Math.abs(props.score).toFixed(1);
 });
 
-const barStyle = computed(() => {
-  // Конвертируем оценку в проценты (от -5 до +5 пешек для наглядности)
-  let percentage;
+const whiteStyle = computed(() => {
+  let whitePercentage: number;
+
   if (props.mate !== null) {
-    percentage = props.mate > 0 ? 100 : 0;
+    whitePercentage = props.mate > 0 ? 100 : 0;
   } else {
-    percentage = ((props.score + 5) / 10) * 100;
-    percentage = Math.max(5, Math.min(95, percentage));
+    // 0.0 -> 50%, +4 -> 100%, -4 -> 0%
+    whitePercentage = 50 + (props.score / 8) * 50;
+    whitePercentage = Math.max(0, Math.min(100, whitePercentage));
   }
 
-  // Инвертируем если ориентация черных
-  if (props.orientation === 'black') percentage = 100 - percentage;
-
+  // Если смотрим за черных, инвертируем высоту (белые сверху)
   return {
-    height: `${percentage}%`,
-    backgroundColor: 'white'
+    height: `${whitePercentage}%`
   };
 });
 </script>
 
 <style scoped>
 .eval-bar-container {
-  width: 30px;
-  height: 100%;
-  background-color: #403d39;
-  position: relative;
-  display: flex;
-  flex-direction: column-reverse;
-  border-radius: 4px;
-  overflow: hidden;
-}
-.eval-bar-fill {
-  transition: height 0.3s ease-out;
   width: 100%;
+  height: 100%;
+  background: #262421; /* Зона черных */
+  display: flex;
+  position: relative;
+  overflow: hidden;
+  border-radius: 4px;
+  /* Белые по умолчанию растут СНИЗУ (для ориентации white) */
+  flex-direction: column-reverse;
+}
+
+/* Если ориентация BLACK, доска перевернута -> Белые растут СВЕРХУ */
+.eval-bar-container.black {
+  flex-direction: column;
+}
+
+.white-fill {
+  background: #f1f1f1;
+  width: 100%;
+  transition: height 0.4s ease-out;
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-  padding-top: 5px;
+  padding: 4px 0;
 }
-.eval-text {
+
+.black-area-text {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end; /* Для белой ориентации текст черных внизу */
+  padding: 4px 0;
+}
+
+/* Позиционирование текста черных при смене ориентации */
+.black .black-area-text {
+  align-items: flex-start;
+}
+
+.score-text {
   font-size: 11px;
   font-weight: bold;
-  color: #fff;
+  font-family: sans-serif;
 }
-.eval-text.text-black { color: #000; }
+.text-black { color: #000; }
+.text-white { color: #fff; }
 </style>

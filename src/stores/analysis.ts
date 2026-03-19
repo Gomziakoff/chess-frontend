@@ -1,51 +1,154 @@
-import { defineStore } from 'pinia';
+import { defineStore } from "pinia";
+import { Chess } from "chess.js";
+
+const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 interface EngineLine {
   depth: number;
-  seldepth: number;
   multipv: number;
-  score: string; // "0.25", "-1.2", "M5"
-  nodes: number;
-  nps: number;
-  pv: string; // "e2e4 e7e5..."
-  san?: string; // Если захотите конвертировать UCI в SAN
+  score: string; // Абсолютная строка (+1.20, -0.50, #3, #-2)
+  pv: string;
 }
 
-export const useAnalysisStore = defineStore('analysis', {
+interface AnalysisStep {
+  fen: string;
+  san: string;
+  uci: string;
+  ply: number;
+}
+
+export const useAnalysisStore = defineStore("analysis", {
   state: () => ({
+    // Состояние движка
     worker: null as Worker | null,
     isReady: false,
     isThinking: false,
     engineLines: [] as EngineLine[],
     depth: 0,
-    evalScore: 0, // В пешках (центрипавны)
-    mate: null as number | null,
-    bestMove: '',
+    evalScore: 0,        // Абсолютный (центрипавны)
+    mate: null as number | null, // Абсолютный (+ белым, - черным)
+    bestMove: null as string | null,
+    analyzingTurn: "w" as "w" | "b", // Сторона, которую обсчитывает движок в данный момент
+
+    // Состояние доски
+    chess: new Chess(),
+    initialFen: START_FEN,
+    history: [] as AnalysisStep[],
+    currentStepIndex: -1,
+    orientation: "white" as "white" | "black",
+
     config: {
       threads: 4,
       hash: 64,
       multiPv: 3,
-      depth: 20
-    }
+      depth: 20,
+    },
   }),
 
+  getters: {
+    currentFen: (state) => state.chess.fen(),
+    canGoBack: (state) => state.currentStepIndex >= 0,
+    canGoForward: (state) => state.currentStepIndex < state.history.length - 1,
+  },
+
   actions: {
+    // --- Логика шахматных ходов ---
+
+    initNewGame() {
+      this.initialFen = START_FEN;
+      this.history = [];
+      this.currentStepIndex = -1;
+      this.chess.load(START_FEN);
+      this.stopAnalysis();
+      this.analyzeFen(this.initialFen);
+    },
+
+    initFromGame(fen: string, history: any[] = []) {
+      this.initialFen = fen;
+      this.history = history.map((h, index) => ({
+        fen: h.fen,
+        san: h.san,
+        uci: h.uci,
+        ply: h.ply || index + 1,
+      }));
+
+      this.currentStepIndex = this.history.length - 1;
+      const lastFen = this.history.length > 0
+          ? this.history[this.history.length - 1].fen
+          : fen;
+
+      this.chess.load(lastFen);
+      this.stopAnalysis();
+      this.analyzeFen(lastFen);
+    },
+
+    makeMove(uci: string) {
+      try {
+        const move = this.chess.move(uci);
+        if (move) {
+          if (this.currentStepIndex < this.history.length - 1) {
+            this.history = this.history.slice(0, this.currentStepIndex + 1);
+          }
+
+          const lastPly = this.currentStepIndex >= 0
+              ? this.history[this.currentStepIndex].ply
+              : this.calculateInitialPly(this.initialFen);
+
+          this.history.push({
+            fen: this.chess.fen(),
+            san: move.san,
+            uci: move.lan,
+            ply: lastPly + 1,
+          });
+
+          this.currentStepIndex++;
+          this.analyzeFen(this.chess.fen());
+        }
+      } catch (e) {
+        console.error("Invalid move", e);
+      }
+    },
+
+    calculateInitialPly(fen: string): number {
+      const parts = fen.split(" ");
+      const moveNumber = parseInt(parts[5], 10) || 1;
+      const sideToMove = parts[1];
+      return (moveNumber - 1) * 2 + (sideToMove === "b" ? 1 : 0);
+    },
+
+    goToStep(index: number) {
+      if (index === -1) {
+        this.currentStepIndex = -1;
+        this.chess.load(this.initialFen);
+      } else if (index >= 0 && index < this.history.length) {
+        this.currentStepIndex = index;
+        this.chess.load(this.history[index].fen);
+      }
+      this.analyzeFen(this.chess.fen());
+    },
+
+    prevMove() {
+      if (this.currentStepIndex >= 0) {
+        this.goToStep(this.currentStepIndex - 1);
+      }
+    },
+
+    nextMove() {
+      if (this.currentStepIndex < this.history.length - 1) {
+        this.goToStep(this.currentStepIndex + 1);
+      }
+    },
+
+    // --- Логика Движка ---
+
     initEngine() {
       if (this.worker) return;
+      this.worker = new Worker("/engines/stockfish-17/stockfish-17.js");
+      this.worker.onmessage = (event) => this.parseUciOutput(event.data);
 
-      // Путь к воркеру в папке public
-      this.worker = new Worker('/engines/stockfish-17/stockfish-17.js');
-
-      this.worker.onmessage = (event) => {
-        const line = event.data;
-        this.parseUciOutput(line);
-      };
-
-      this.sendMessage('uci');
+      this.sendMessage("uci");
       this.sendMessage(`setoption name MultiPV value ${this.config.multiPv}`);
-      this.sendMessage(`setoption name Threads value ${this.config.threads}`);
-      this.sendMessage(`setoption name Hash value ${this.config.hash}`);
-      this.sendMessage('isready');
+      this.sendMessage("isready");
     },
 
     sendMessage(cmd: string) {
@@ -53,63 +156,91 @@ export const useAnalysisStore = defineStore('analysis', {
     },
 
     analyzeFen(fen: string) {
-      if (!this.worker) this.initEngine();
-      
+      if (!this.isReady) return;
+
+      // Извлекаем сторону из FEN для абсолютной оценки
+      const turnPart = fen.split(" ")[1];
+      this.analyzingTurn = turnPart === "b" ? "b" : "w";
+
       this.isThinking = true;
       this.engineLines = [];
-      this.sendMessage('stop');
+      this.bestMove = null; 
+      this.depth = 0;
+      
+      this.sendMessage("stop");
       this.sendMessage(`position fen ${fen}`);
       this.sendMessage(`go depth ${this.config.depth}`);
     },
 
     stopAnalysis() {
-      this.sendMessage('stop');
+      this.sendMessage("stop");
       this.isThinking = false;
     },
 
     parseUciOutput(line: string) {
-      if (line === 'readyok') this.isReady = true;
+      if (line === "readyok") this.isReady = true;
 
-      // Парсинг строки 'info depth ... score cp ... pv ...'
-      if (line.startsWith('info') && line.includes('depth')) {
-        const depthMatch = line.match(/depth (\d+)/);
-        const cpMatch = line.match(/score cp (-?\d+)/);
-        const mateMatch = line.match(/score mate (-?\d+)/);
-        const pvMatch = line.match(/ pv (.+)/);
+      // 1. Конечный результат анализа
+      if (line.startsWith("bestmove")) {
+        const parts = line.split(" ");
+        if (parts[1] && parts[1] !== "(none)") {
+          this.bestMove = parts[1];
+        }
+        this.isThinking = false;
+        return;
+      }
+
+      // 2. Промежуточная информация
+      if (line.startsWith("info")) {
         const multiPvMatch = line.match(/multipv (\d+)/);
+        const multiPvIdx = multiPvMatch ? parseInt(multiPvMatch[1]) - 1 : 0;
 
+        // Мгновенное получение хода из PV (для стрелки)
+        const pvMatch = line.match(/ pv ([a-h][1-8][a-h][1-8][qrbn]?)/);
+        if (multiPvIdx === 0 && pvMatch) {
+          this.bestMove = pvMatch[1];
+        }
+
+        const depthMatch = line.match(/depth (\d+)/);
         if (depthMatch) this.depth = parseInt(depthMatch[1]);
 
+        const cpMatch = line.match(/score cp (-?\d+)/);
+        const mateMatch = line.match(/score mate (-?\d+)/);
+        const fullPvMatch = line.match(/ pv (.+)/);
+
         if (cpMatch || mateMatch) {
-          const multiPvIdx = multiPvMatch ? parseInt(multiPvMatch[1]) - 1 : 0;
-          
-          const info: EngineLine = {
-            depth: this.depth,
-            seldepth: 0,
-            multipv: multiPvIdx + 1,
-            score: cpMatch ? (parseInt(cpMatch[1]) / 100).toFixed(2) : `M${mateMatch![1]}`,
-            nodes: 0,
-            nps: 0,
-            pv: pvMatch ? pvMatch[1] : ''
-          };
+          // Множитель для перевода из относительной оценки в абсолютную
+          const multiplier = this.analyzingTurn === "w" ? 1 : -1;
 
-          this.engineLines[multiPvIdx] = info;
+          let absScoreString = "";
 
-          if (multiPvIdx === 0) {
-            if (cpMatch) {
-              this.evalScore = parseInt(cpMatch[1]) / 100;
+          if (cpMatch) {
+            const absScore = (parseInt(cpMatch[1]) / 100) * multiplier;
+            absScoreString = absScore > 0 ? `+${absScore.toFixed(2)}` : absScore.toFixed(2);
+            
+            if (multiPvIdx === 0) {
+              this.evalScore = absScore;
               this.mate = null;
-            } else if (mateMatch) {
-              this.mate = parseInt(mateMatch[1]);
+            }
+          } else if (mateMatch) {
+            const mateVal = parseInt(mateMatch[1]) * multiplier;
+            // Формат: #3 (белые ставят), #-3 (черные ставят)
+            absScoreString = mateVal > 0 ? `#${Math.abs(mateVal)}` : `#-${Math.abs(mateVal)}`;
+            
+            if (multiPvIdx === 0) {
+              this.mate = mateVal;
             }
           }
+
+          // Обновляем список линий (EngineOutput будет брать отсюда готовые строки)
+          this.engineLines[multiPvIdx] = {
+            depth: this.depth,
+            multipv: multiPvIdx + 1,
+            score: absScoreString,
+            pv: fullPvMatch ? fullPvMatch[1] : "",
+          };
         }
       }
-
-      if (line.startsWith('bestmove')) {
-        this.bestMove = line.split(' ')[1];
-        this.isThinking = false;
-      }
-    }
-  }
+    },
+  },
 });
