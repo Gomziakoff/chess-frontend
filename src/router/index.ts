@@ -6,6 +6,7 @@ import Game from '../views/Game.vue'
 import Watch from '../views/Watch.vue'
 import Login from '../views/Login.vue'
 import Test from '../views/Test.vue'
+import Test2 from '../views/Test2.vue'
 import { useAuthStore } from '../stores/auth'
 
 const routes = [
@@ -18,6 +19,11 @@ const routes = [
     path: '/test',
     name: 'Test',
     component: Test,
+  },
+  {
+    path: '/test2',
+    name: 'Test2',
+    component: Test2,
   },
   {
     path: '/lobby',
