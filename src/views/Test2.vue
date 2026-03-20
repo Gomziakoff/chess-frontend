@@ -19,6 +19,7 @@
           :orientation="analysisStore.orientation"
           :engine-move="analysisStore.bestMove"
           :next-history-move="nextMoveInHistory"
+          :maia-move="analysisStore.maiaResults[0]?.move"
           @move="onUserMove"
         />
       </div>
@@ -49,6 +50,8 @@
         <MovesList 
           :moves="analysisStore.history" 
           :currentIndex="analysisStore.currentStepIndex"
+          :status="'active'"
+          :winner="null"
           @select="analysisStore.goToStep"
           @prev="analysisStore.prevMove"
           @next="analysisStore.nextMove"

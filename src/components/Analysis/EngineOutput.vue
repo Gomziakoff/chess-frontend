@@ -1,54 +1,87 @@
 <template>
   <div class="engine-output">
-    <div class="engine-header">
-      <span class="engine-name">Stockfish 16.1</span>
-      <span v-if="isThinking" class="engine-depth">Глубина {{ depth }}</span>
+    <div class="output-header">
+      <div class="header-col">Stockfish 17</div>
+      <div class="header-col">Maia {{ store.maiaElo }}</div>
     </div>
-    
-    <div class="lines">
-      <div v-for="line in sortedLines" :key="line.multipv" class="line-row">
-        <span class="line-score" :class="getScoreColorClass(line.score)">
-          {{ line.score }}
-        </span>
-        <span class="line-pv">{{ truncatePv(line.pv) }}</span>
+
+    <div class="output-content">
+      <!-- Колонка Stockfish -->
+      <div class="engine-col">
+        <div 
+          v-for="(line, index) in sfLines" 
+          :key="'sf-' + index" 
+          class="move-row"
+          @mouseenter="hoveredId = 'sf-' + index"
+          @mouseleave="hoveredId = null"
+          @click="store.makeMove(line.uci)"
+        >
+          <span class="move-name">{{ getSan(line.uci) }}</span>
+          <span class="move-val" :class="getScoreClass(line.score)">{{ line.score }}</span>
+          
+          <MoveTooltip 
+            v-if="hoveredId === 'sf-' + index" 
+            :move="line.uci" 
+            side="right"
+          />
+        </div>
+      </div>
+
+      <!-- Колонка Maia -->
+      <div class="engine-col">
+        <div 
+          v-for="(m, index) in store.maiaResults" 
+          :key="'maia-' + index" 
+          class="move-row"
+          @mouseenter="hoveredId = 'maia-' + index"
+          @mouseleave="hoveredId = null"
+          @click="store.makeMove(m.move)"
+        >
+          <span class="move-name">{{ getSan(m.move) }}</span>
+          <span class="move-val prob">{{ (m.prob * 100).toFixed(1) }}%</span>
+
+          <MoveTooltip 
+            v-if="hoveredId === 'maia-' + index" 
+            :move="m.move" 
+            side="left"
+          />
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import { Chess } from 'chess.js'; // Импортируем прямо сюда
+import { useAnalysisStore } from '../../stores/analysis';
+import MoveTooltip from './MoveTooltip.vue';
 
-// Описываем интерфейс линии прямо здесь или импортируем из типов
-interface EngineLine {
-  depth: number;
-  multipv: number;
-  score: string;
-  pv: string;
+const store = useAnalysisStore();
+const hoveredId = ref<string | null>(null);
+
+// Функция-переводчик UCI -> SAN
+function getSan(uci: string) {
+  if (!uci) return '...';
+  try {
+    const tempChess = new Chess(store.currentFen);
+    const move = tempChess.move(uci);
+    return move ? move.san : uci;
+  } catch (e) {
+    return uci;
+  }
 }
 
-const props = defineProps<{
-  lines: EngineLine[];
-  isThinking: boolean;
-  depth: number;
-}>();
-
-const sortedLines = computed(() => {
-  return [...props.lines]
-    .filter(l => l && l.score)
-    .sort((a, b) => a.multipv - b.multipv);
+const sfLines = computed(() => {
+  return store.engineLines.slice(0, 4).map(l => ({
+    ...l,
+    uci: l.pv.split(' ')[0] // Извлекаем первый ход из PV
+  }));
 });
 
-function getScoreColorClass(score: string) {
-  if (score.includes('#')) return 'score-mate';
-  const val = parseFloat(score);
-  if (val > 0.4) return 'score-white';
-  if (val < -0.4) return 'score-black';
-  return '';
-}
-
-function truncatePv(pv: string) {
-  return pv ? pv.split(' ').slice(0, 5).join(' ') + '...' : '...';
+function getScoreClass(score: string) {
+  if (score?.includes('#')) return 'text-mate';
+  return parseFloat(score) >= 0 ? 'text-plus' : 'text-minus';
 }
 </script>
 
@@ -56,45 +89,50 @@ function truncatePv(pv: string) {
 .engine-output {
   background: #262421;
   color: #bababa;
-  padding: 10px;
-  font-size: 13px;
+  padding: 8px;
   border-radius: 4px;
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  /* Важно для тултипов */
+  overflow: visible; 
+  position: relative;
+  z-index: 100;
 }
-.engine-header {
+.output-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  font-size: 11px;
+  margin-bottom: 6px;
+  color: #888;
+  font-weight: bold;
+}
+.output-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  overflow: visible;
+}
+.engine-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow: visible;
+}
+.move-row {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 8px;
-  border-bottom: 1px solid #333;
-  padding-bottom: 4px;
-}
-.engine-name { font-weight: bold; color: #999; }
-.engine-depth { font-size: 11px; color: #666; }
-
-.line-row {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 4px;
-  align-items: center;
-}
-.line-score {
-  background: #312e2b;
-  padding: 2px 6px;
+  padding: 5px 8px;
+  background: #2f2c29;
   border-radius: 3px;
-  min-width: 50px;
-  text-align: center;
-  font-weight: bold;
-  font-family: monospace;
+  font-size: 13px;
+  cursor: pointer;
+  position: relative; /* Чтобы тултип прилипал к строке */
 }
-
-.score-white { color: #7fa650; } /* Плюс (лучше белым) */
-.score-black { color: #a54a4a; } /* Минус (лучше черным) */
-.score-mate { color: #f9d848; }
-
-.line-pv {
-  color: #888;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.move-row:hover {
+  background: #363330;
 }
+.move-name { font-weight: bold; color: #fff; font-family: sans-serif; }
+.move-val { font-family: monospace; font-size: 12px; }
+.prob { color: #7fa650; }
+.text-plus { color: #7fa650; }
+.text-minus { color: #a54a4a; }
+.text-mate { color: #f9d848; }
 </style>

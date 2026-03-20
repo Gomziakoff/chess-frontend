@@ -27,6 +27,7 @@ interface Props {
   allowMoves?: boolean
   engineMove?: string | null 
   nextHistoryMove?: string | null 
+  maiaMove?:string | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -67,6 +68,10 @@ function updateArrows() {
   // 2. Зеленая стрелка (движок)
   if (props.engineMove && props.engineMove.length >= 4) {
     shapes.push(uciToShape(props.engineMove, 'green'))
+  }
+
+  if (props.maiaMove && props.maiaMove.length >= 4) {
+    shapes.push(uciToShape(props.maiaMove, 'red'))
   }
 
   // Использование API для принудительной отрисовки

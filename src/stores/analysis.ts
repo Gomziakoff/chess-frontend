@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { Chess } from "chess.js";
+import Maia from "../lib/engine/maia";
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -17,6 +18,11 @@ interface AnalysisStep {
   ply: number;
 }
 
+interface MaiaResult {
+  move: string;
+  prob: number;
+}
+
 export const useAnalysisStore = defineStore("analysis", {
   state: () => ({
     // Состояние движка
@@ -25,7 +31,7 @@ export const useAnalysisStore = defineStore("analysis", {
     isThinking: false,
     engineLines: [] as EngineLine[],
     depth: 0,
-    evalScore: 0,        // Абсолютный (центрипавны)
+    evalScore: 0, // Абсолютный (центрипавны)
     mate: null as number | null, // Абсолютный (+ белым, - черным)
     bestMove: null as string | null,
     analyzingTurn: "w" as "w" | "b", // Сторона, которую обсчитывает движок в данный момент
@@ -40,9 +46,14 @@ export const useAnalysisStore = defineStore("analysis", {
     config: {
       threads: 4,
       hash: 64,
-      multiPv: 3,
+      multiPv: 4,
       depth: 20,
     },
+
+   maiaInstance: null as Maia | null,
+    maiaStatus: 'loading' as string,
+    maiaResults: [] as { move: string, prob: number }[],
+    maiaElo: 1500,
   }),
 
   getters: {
@@ -73,7 +84,8 @@ export const useAnalysisStore = defineStore("analysis", {
       }));
 
       this.currentStepIndex = this.history.length - 1;
-      const lastFen = this.history.length > 0
+      const lastFen =
+        this.history.length > 0
           ? this.history[this.history.length - 1].fen
           : fen;
 
@@ -90,7 +102,8 @@ export const useAnalysisStore = defineStore("analysis", {
             this.history = this.history.slice(0, this.currentStepIndex + 1);
           }
 
-          const lastPly = this.currentStepIndex >= 0
+          const lastPly =
+            this.currentStepIndex >= 0
               ? this.history[this.currentStepIndex].ply
               : this.calculateInitialPly(this.initialFen);
 
@@ -149,6 +162,8 @@ export const useAnalysisStore = defineStore("analysis", {
       this.sendMessage("uci");
       this.sendMessage(`setoption name MultiPV value ${this.config.multiPv}`);
       this.sendMessage("isready");
+
+      this.initMaia()
     },
 
     sendMessage(cmd: string) {
@@ -164,12 +179,14 @@ export const useAnalysisStore = defineStore("analysis", {
 
       this.isThinking = true;
       this.engineLines = [];
-      this.bestMove = null; 
+      this.bestMove = null;
       this.depth = 0;
-      
+
       this.sendMessage("stop");
       this.sendMessage(`position fen ${fen}`);
       this.sendMessage(`go depth ${this.config.depth}`);
+
+      this.runMaia(fen);
     },
 
     stopAnalysis() {
@@ -216,8 +233,9 @@ export const useAnalysisStore = defineStore("analysis", {
 
           if (cpMatch) {
             const absScore = (parseInt(cpMatch[1]) / 100) * multiplier;
-            absScoreString = absScore > 0 ? `+${absScore.toFixed(2)}` : absScore.toFixed(2);
-            
+            absScoreString =
+              absScore > 0 ? `+${absScore.toFixed(2)}` : absScore.toFixed(2);
+
             if (multiPvIdx === 0) {
               this.evalScore = absScore;
               this.mate = null;
@@ -225,8 +243,9 @@ export const useAnalysisStore = defineStore("analysis", {
           } else if (mateMatch) {
             const mateVal = parseInt(mateMatch[1]) * multiplier;
             // Формат: #3 (белые ставят), #-3 (черные ставят)
-            absScoreString = mateVal > 0 ? `#${Math.abs(mateVal)}` : `#-${Math.abs(mateVal)}`;
-            
+            absScoreString =
+              mateVal > 0 ? `#${Math.abs(mateVal)}` : `#-${Math.abs(mateVal)}`;
+
             if (multiPvIdx === 0) {
               this.mate = mateVal;
             }
@@ -240,6 +259,34 @@ export const useAnalysisStore = defineStore("analysis", {
             pv: fullPvMatch ? fullPvMatch[1] : "",
           };
         }
+      }
+    },
+
+    initMaia() {
+      if (this.maiaInstance) return;
+      
+      this.maiaInstance = new Maia({
+        model: 'https://raw.githubusercontent.com/CSSLab/maia-platform-frontend/e23a50e/public/maia2/maia_rapid.onnx',
+        setStatus: (s) => { this.maiaStatus = s; },
+        setProgress: (p) => { /* можно добавить в стейт если нужно */ },
+        setError: (err) => { console.error('Maia Error:', err); }
+      });
+    },
+
+    async runMaia(fen: string) {
+      if (!this.maiaInstance || this.maiaStatus !== 'ready') return;
+      
+      try {
+        // Оцениваем позицию через Maia
+        const result = await this.maiaInstance.evaluate(fen, this.maiaElo, this.maiaElo);
+        
+        // Берем топ-4 хода
+        this.maiaResults = Object.entries(result.policy)
+          .map(([move, prob]) => ({ move, prob: prob as number }))
+          .slice(0, 4);
+      } catch (e) {
+        console.error("Maia evaluation error:", e);
+        this.maiaResults = [];
       }
     },
   },
