@@ -13,7 +13,7 @@
                 <a href="#" class="nav-link">ЗАДАЧИ</a>
                 <a href="#" class="nav-link">ДЕБЮТЫ</a>
                 <a href="#" class="nav-link">ПРОСМОТР</a>
-                <a href="#" class="nav-link">ИНСТРУМЕНТЫ</a>
+                <a href="/analysis" class="nav-link">АНАЛИЗ</a>
                 <a href="#" class="nav-link support">ПОДДЕРЖАТЬ ПРОЕКТ</a>
             </nav>
         </div>

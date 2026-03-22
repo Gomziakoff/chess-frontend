@@ -60,12 +60,10 @@
                     @resign="onResignClick" />
             </div>
         </div>
-        <MaiaLoaderModal 
-      :status="analysisStore.maiaStatus"
-      :progress="analysisStore.maiaProgress"
-      @download="analysisStore.downloadMaia"
-      @close="analysisStore.skipMaia"
-    />
+        <MaiaLoaderModal :status="analysisStore.maiaStatus" :progress="analysisStore.maiaProgress"
+            @download="analysisStore.downloadMaia" @close="analysisStore.skipMaia" />
+        <AnalysisSummaryModal :show="analysisStore.showSummary" :data="analysisStore.summaryData"
+            @close="analysisStore.showSummary = false" />
     </div>
 </template>
 
@@ -81,36 +79,38 @@ import PositionDescription from '../components/Analysis/PositionDescription.vue'
 import { useAnalysisStore } from '../stores/analysis';
 import { describePosition } from '../lib/engine/describer'; // Импорт логики описания
 import MaiaLoaderModal from '../components/Analysis/MaiaLoaderModal.vue';
+import AnalysisSummaryModal from '../components/Analysis/AnalysisSummaryModal.vue';
+
 
 const analysisStore = useAnalysisStore();
 const route = useRoute();
 
 // Логика формирования текстовых сегментов для PositionDescription
 const descriptionSegments = computed(() => {
-  // Если идет полный анализ, возвращаем пустой массив (ничего не считаем)
-  if (analysisStore.isFullAnalysisRunning || analysisStore.engineLines.length === 0) {
-    return [];
-  }
-
-  const evals: Record<string, number> = {};
-  analysisStore.engineLines.forEach(line => {
-    const firstMove = line.pv.split(' ')[0];
-    if (firstMove) {
-      let score = parseFloat(line.score);
-      if (line.score.includes('#')) {
-        score = line.score.includes('-') ? -1000 : 1000;
-      } else {
-        score = Math.round(score * 100);
-      }
-      evals[firstMove] = score;
+    // Если идет полный анализ, возвращаем пустой массив (ничего не считаем)
+    if (analysisStore.isFullAnalysisRunning || analysisStore.engineLines.length === 0) {
+        return [];
     }
-  });
 
-  return describePosition(
-    analysisStore.currentFen,
-    evals,
-    analysisStore.analyzingTurn === 'w'
-  ).segments;
+    const evals: Record<string, number> = {};
+    analysisStore.engineLines.forEach(line => {
+        const firstMove = line.pv.split(' ')[0];
+        if (firstMove) {
+            let score = parseFloat(line.score);
+            if (line.score.includes('#')) {
+                score = line.score.includes('-') ? -1000 : 1000;
+            } else {
+                score = Math.round(score * 100);
+            }
+            evals[firstMove] = score;
+        }
+    });
+
+    return describePosition(
+        analysisStore.currentFen,
+        evals,
+        analysisStore.analyzingTurn === 'w'
+    ).segments;
 });
 
 const nextMoveInHistory = computed(() => {
@@ -262,27 +262,30 @@ watch(() => route.params.id, () => {
 }
 
 .full-analysis-progress {
-  padding: 10px;
-  background: #262421;
-  border: 1px solid #4a6fa5;
-  border-radius: 4px;
-  margin-bottom: 8px;
+    padding: 10px;
+    background: #262421;
+    border: 1px solid #4a6fa5;
+    border-radius: 4px;
+    margin-bottom: 8px;
 }
+
 .progress-label {
-  font-size: 12px;
-  color: #bababa;
-  margin-bottom: 5px;
+    font-size: 12px;
+    color: #bababa;
+    margin-bottom: 5px;
 }
+
 .progress-bar {
-  height: 4px;
-  background: #333;
-  border-radius: 2px;
-  overflow: hidden;
+    height: 4px;
+    background: #333;
+    border-radius: 2px;
+    overflow: hidden;
 }
+
 .progress-fill {
-  height: 100%;
-  background: #4a6fa5;
-  transition: width 0.3s ease;
+    height: 100%;
+    background: #4a6fa5;
+    transition: width 0.3s ease;
 }
 
 @media (max-width: 1024px) {

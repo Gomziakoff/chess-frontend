@@ -61,6 +61,13 @@ export const useAnalysisStore = defineStore("analysis", {
 
     isFullAnalysisRunning: false,
     fullAnalysisProgress: 0, // Процент выполнения
+    showSummary: false,
+    summaryData: {
+      white: { elo: 0, accuracy: 0, sfAccuracy: 0, acpl: 0, blunders: 0, mistakes: 0 },
+      black: { elo: 0, accuracy: 0, sfAccuracy: 0, acpl: 0, blunders: 0, mistakes: 0 }
+    },
+    isCalculatingSummary: false,
+    summaryProgress: 0,
   }),
 
   getters: {
@@ -79,6 +86,85 @@ export const useAnalysisStore = defineStore("analysis", {
       this.chess.load(START_FEN);
       this.stopAnalysis();
       this.analyzeFen(this.initialFen);
+    },
+
+     async calculateGameLevel() {
+      if (this.history.length === 0) return;
+      
+      this.isCalculatingSummary = true;
+      const eloLevels = [1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900];
+      
+      const players = {
+        w: { 
+          maiaScores: new Array(eloLevels.length).fill(0), 
+          totalLoss: 0, 
+          blunders: 0, 
+          mistakes: 0, 
+          inaccuracies: 0,
+          count: 0 
+        },
+        b: { 
+          maiaScores: new Array(eloLevels.length).fill(0), 
+          totalLoss: 0, 
+          blunders: 0, 
+          mistakes: 0, 
+          inaccuracies: 0,
+          count: 0 
+        }
+      };
+
+      for (let i = 0; i < this.history.length; i++) {
+        const step = this.history[i];
+        const prevFen = i === 0 ? this.initialFen : this.history[i-1].fen;
+        const turn = prevFen.split(' ')[1] as 'w' | 'b';
+        
+        // 1. Расчет для Maia (как было)
+        if (this.maiaInstance && this.maiaStatus === 'ready') {
+          const { result } = await this.maiaInstance.batchEvaluate(eloLevels.map(() => prevFen), eloLevels, eloLevels);
+          result.forEach((res, idx) => {
+            players[turn].maiaScores[idx] += (res.policy[step.uci] || 0);
+          });
+        }
+
+        // 2. Расчет статистики Stockfish (на основе уже имеющейся классификации)
+        // Мы предполагаем, что runFullAnalysis уже заполнил step.classification
+        if (step.classification === 'blunder') players[turn].blunders++;
+        if (step.classification === 'mistake') players[turn].mistakes++;
+        if (step.classification === 'inaccuracy') players[turn].inaccuracies++;
+        
+        players[turn].count++;
+      }
+
+      const finalize = (p: typeof players.w) => {
+        if (p.count === 0) return { elo: 1100, accuracy: 0, sfAccuracy: 0, blunders: 0, mistakes: 0 };
+        
+        // Расчет ELO Maia
+        const avgMaiaScores = p.maiaScores.map(s => s / p.count);
+        const maxIdx = avgMaiaScores.indexOf(Math.max(...avgMaiaScores));
+
+        // Формула точности Stockfish (упрощенная весовая модель)
+        // Best=100%, Excellent=100%, Good=80%, Inacc=50%, Mistake=20%, Blunder=0%
+        const accuracyPoints = (p.count - p.inaccuracies - p.mistakes - p.blunders) * 100 
+                             + (p.inaccuracies * 60) 
+                             + (p.mistakes * 30)
+                             + (p.blunders * 0);
+        
+        return {
+          elo: eloLevels[maxIdx],
+          accuracy: Math.round(avgMaiaScores[maxIdx] * 100), // Сходство с Maia
+          sfAccuracy: Math.round(accuracyPoints / p.count), // Точность Stockfish
+          blunders: p.blunders,
+          mistakes: p.mistakes
+        };
+      };
+
+      this.summaryData = {
+        white: finalize(players.w),
+        black: finalize(players.b)
+      };
+
+      this.isCalculatingSummary = false;
+      this.showSummary = true;
     },
 
      async runFullAnalysis() {
@@ -112,6 +198,7 @@ export const useAnalysisStore = defineStore("analysis", {
       }
 
       this.isFullAnalysisRunning = false;
+      await this.calculateGameLevel();
     },
 
     /**
@@ -519,4 +606,6 @@ export const useAnalysisStore = defineStore("analysis", {
       }
     },
   },
+
+
 });
