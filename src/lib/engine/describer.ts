@@ -6,6 +6,48 @@ export interface DescriptionSegment {
   uci?: string;
 }
 
+export type MoveClassification = 
+  | 'brilliant' | 'great' | 'best' | 'excellent' | 'good' 
+  | 'inaccuracy' | 'mistake' | 'blunder' | 'book';
+
+function getWinProb(cp: number): number {
+  return 1 / (1 + Math.pow(10, -cp / 400));
+}
+
+export function classifyMove(
+  moveEval: number, // Оценка сделанного хода (POV игрока)
+  bestEval: number, // Оценка лучшего хода (POV игрока)
+  prevEval: number, // Оценка предыдущей позиции (POV игрока)
+): MoveClassification {
+  const moveWP = getWinProb(moveEval);
+  const bestWP = getWinProb(bestEval);
+  
+  // Потеря шансов на победу (от 0 до 1)
+  const loss = bestWP - moveWP;
+
+  // 1. Если это лучший ход по мнению движка
+  if (loss <= 0.005) return 'best'; 
+
+  // 2. Классификация по потере шансов (пороги как на Chess.com)
+  if (loss < 0.02) return 'excellent';
+  if (loss < 0.05) return 'good';
+  if (loss < 0.12) return 'inaccuracy';
+  if (loss < 0.25) return 'mistake';
+  return 'blunder';
+}
+
+export const CLASSIFICATION_DATA = {
+  brilliant: { label: '!!', color: '#1baca6', icon: '🌟' },
+  great: { label: '!', color: '#5c8bb0', icon: '⭐' },
+  best: { label: '', color: '#95bb4a', icon: '✅' },
+  excellent: { label: '', color: '#95bb4a', icon: '✔️' },
+  good: { label: '', color: '#95bb4a', icon: '👍' },
+  book: { label: '', color: '#a88865', icon: '📖' },
+  inaccuracy: { label: '?!', color: '#f0c15c', icon: '🤔' },
+  mistake: { label: '?', color: '#e58f2a', icon: '❓' },
+  blunder: { label: '??', color: '#ca3431', icon: '⁉️' },
+};
+
 const textSeg = (content: string): DescriptionSegment => ({ type: 'text', content });
 const moveSeg = (san: string, uci: string): DescriptionSegment => ({ type: 'move', content: san, uci });
 

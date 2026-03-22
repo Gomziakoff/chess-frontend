@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { Chess } from "chess.js";
 import Maia from "../lib/engine/maia";
+import { classifyMove, type MoveClassification } from "../lib/engine/describer";
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -16,6 +17,7 @@ interface AnalysisStep {
   san: string;
   uci: string;
   ply: number;
+  classification?: MoveClassification;
 }
 
 interface MaiaResult {
@@ -95,32 +97,84 @@ export const useAnalysisStore = defineStore("analysis", {
     },
 
     makeMove(uci: string) {
-      try {
-        const move = this.chess.move(uci);
-        if (move) {
-          if (this.currentStepIndex < this.history.length - 1) {
-            this.history = this.history.slice(0, this.currentStepIndex + 1);
-          }
+  try {
+    const turnBeforeMove = this.chess.turn();
+    const multiplier = turnBeforeMove === "w" ? 1 : -1;
 
-          const lastPly =
-            this.currentStepIndex >= 0
-              ? this.history[this.currentStepIndex].ply
-              : this.calculateInitialPly(this.initialFen);
+    let classification: MoveClassification | undefined;
 
-          this.history.push({
-            fen: this.chess.fen(),
-            san: move.san,
-            uci: move.lan,
-            ply: lastPly + 1,
-          });
-
-          this.currentStepIndex++;
-          this.analyzeFen(this.chess.fen());
-        }
-      } catch (e) {
-        console.error("Invalid move", e);
+    // Вспомогательная функция парсинга строки в число сантипешек
+    const parseScore = (scoreStr: string): number => {
+      if (scoreStr.includes("#")) {
+        const mateIn = parseInt(scoreStr.replace("#", ""));
+        return mateIn > 0 ? 10000 - mateIn : -10000 + Math.abs(mateIn);
       }
-    },
+      return parseFloat(scoreStr) * 100;
+    };
+
+    if (this.engineLines.length > 0) {
+      const bestLine = this.engineLines[0];
+      
+      // Лучший ход (UCI) и его оценка (POV игрока)
+      const bestUci = bestLine.pv.split(" ")[0];
+      const bestEval = parseScore(bestLine.score) * multiplier;
+
+      // Ищем оценку хода, который РЕАЛЬНО сделал пользователь
+      const moveLine = this.engineLines.find((l) => l.pv.startsWith(uci));
+      
+      let moveEval: number;
+      if (uci === bestUci) {
+        moveEval = bestEval;
+        classification = 'best';
+      } else if (moveLine) {
+        moveEval = parseScore(moveLine.score) * multiplier;
+        // Сравниваем через новую функцию
+        classification = classifyMove(moveEval, bestEval, bestEval);
+      } else {
+        // Если хода нет в ТОП-4 (MultiPV), он как минимум плохой.
+        // Чтобы точнее узнать, насколько он плохой, можно 
+        // предположить, что он хуже 4-й линии.
+        const fourthLine = this.engineLines[this.engineLines.length - 1];
+        const fourthEval = parseScore(fourthLine.score) * multiplier;
+        
+        // Считаем его чуть хуже худшей линии из топа
+        moveEval = fourthEval - 50; 
+        classification = classifyMove(moveEval, bestEval, bestEval);
+        
+        // Если после расчетов он все еще "хороший", но его нет в ТОП-4, 
+        // принудительно ставим Inaccuracy
+        if (classification === 'best' || classification === 'excellent') {
+          classification = 'inaccuracy';
+        }
+      }
+    }
+
+    // Совершаем ход
+    const move = this.chess.move(uci);
+    if (move) {
+      if (this.currentStepIndex < this.history.length - 1) {
+        this.history = this.history.slice(0, this.currentStepIndex + 1);
+      }
+
+      const lastPly = this.currentStepIndex >= 0 
+        ? this.history[this.currentStepIndex].ply 
+        : this.calculateInitialPly(this.initialFen);
+
+      this.history.push({
+        fen: this.chess.fen(),
+        san: move.san,
+        uci: move.lan,
+        ply: lastPly + 1,
+        classification // Сохраняем результат
+      });
+
+      this.currentStepIndex++;
+      this.analyzeFen(this.chess.fen());
+    }
+  } catch (e) {
+    console.error("Move error:", e);
+  }
+},
 
     calculateInitialPly(fen: string): number {
       const parts = fen.split(" ");
