@@ -82,7 +82,7 @@ class Maia {
       receivedLength += value.length
 
       const currentProgress = Math.floor((receivedLength / contentLength) * 100)
-      if (currentProgress >= lastReportedProgress + 10) {
+      if (currentProgress >= lastReportedProgress + 1) {
         this.options.setProgress(currentProgress)
         lastReportedProgress = currentProgress
       }

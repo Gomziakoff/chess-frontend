@@ -57,6 +57,7 @@ export const useAnalysisStore = defineStore("analysis", {
     maiaStatus: "loading" as string,
     maiaResults: [] as { move: string; prob: number }[],
     maiaElo: 1500,
+    maiaProgress: 0,
 
     isFullAnalysisRunning: false,
     fullAnalysisProgress: 0, // Процент выполнения
@@ -469,18 +470,32 @@ export const useAnalysisStore = defineStore("analysis", {
       if (this.maiaInstance) return;
 
       this.maiaInstance = new Maia({
-        model:
-          "https://raw.githubusercontent.com/CSSLab/maia-platform-frontend/e23a50e/public/maia2/maia_rapid.onnx",
+        model: "https://raw.githubusercontent.com/CSSLab/maia-platform-frontend/e23a50e/public/maia2/maia_rapid.onnx",
         setStatus: (s) => {
           this.maiaStatus = s;
         },
         setProgress: (p) => {
-          /* можно добавить в стейт если нужно */
+          this.maiaProgress = p; // Записываем прогресс сюда
+          if (p > 0 && p < 100) this.maiaStatus = 'downloading';
         },
         setError: (err) => {
           console.error("Maia Error:", err);
+          this.maiaStatus = 'error';
         },
       });
+    },
+
+    async downloadMaia() {
+      if (!this.maiaInstance) return;
+      try {
+        await this.maiaInstance.downloadModel();
+      } catch (e) {
+        this.maiaStatus = 'error';
+      }
+    },
+
+    skipMaia() {
+      this.maiaStatus = 'idle'; // Специальный статус, чтобы скрыть модалку
     },
 
     async runMaia(fen: string) {

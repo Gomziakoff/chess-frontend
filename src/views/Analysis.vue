@@ -81,6 +81,12 @@
         />
       </div>
     </div>
+    <MaiaLoaderModal 
+      :status="analysisStore.maiaStatus"
+      :progress="analysisStore.maiaProgress"
+      @download="analysisStore.downloadMaia"
+      @close="analysisStore.skipMaia"
+    />
   </div>
 </template>
 
@@ -94,7 +100,7 @@ import BoardController from '../components/Board/BoardController.vue';
 import PositionDescription from '../components/Analysis/PositionDescription.vue'; // Импорт компонента
 import { useAnalysisStore } from '../stores/analysis';
 import { describePosition } from '../lib/engine/describer'; // Импорт логики описания
-
+import MaiaLoaderModal from '../components/Analysis/MaiaLoaderModal.vue';
 const analysisStore = useAnalysisStore();
 
 // Логика формирования текстовых сегментов для PositionDescription
