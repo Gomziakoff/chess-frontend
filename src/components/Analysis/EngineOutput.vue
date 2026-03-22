@@ -83,10 +83,19 @@ function getSan(uci: string) {
 }
 
 const sfLines = computed(() => {
-  return store.engineLines.slice(0, 4).map(l => ({
-    ...l,
-    uci: l.pv.split(' ')[0]
-  }));
+  if (!store.engineLines) return [];
+  
+  return store.engineLines
+    .filter(item => item !== undefined && item !== null && item.pv)
+    .map(l => {
+      const moves = l.pv.split(' ');
+      return {
+        ...l,
+        uci: moves.length > 0 ? moves[0] : ''
+      };
+    })
+    .filter(l => l.uci !== '') // Игнорируем линии без ходов
+    .slice(0, 4);
 });
 
 function getScoreClass(score: string) {

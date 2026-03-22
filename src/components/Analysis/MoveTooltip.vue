@@ -34,17 +34,20 @@ import { useAnalysisStore } from '../../stores/analysis';
 
 const props = defineProps<{ 
   move: string,
-  // Передаем координаты родительского элемента
   parentRect: DOMRect | null,
   side: 'left' | 'right' 
 }>();
 
 const store = useAnalysisStore();
 
-// Вычисляем позицию тултипа относительно окна (fixed)
+// 1. Исправляем поиск инфо: добавляем проверку l && l.pv
+const sfInfo = computed(() => {
+  if (!store.engineLines || store.engineLines.length === 0) return null;
+  return store.engineLines.find(l => l && l.pv && l.pv.startsWith(props.move)) || null;
+});
+
 const floatingStyle = computed(() => {
   if (!props.parentRect) return {};
-
   const gap = 10;
   const top = props.parentRect.top + props.parentRect.height / 2;
   
@@ -63,33 +66,53 @@ const floatingStyle = computed(() => {
   }
 });
 
-// --- Остальная ваша логика вычислений (без изменений) ---
 const maiaProb = computed(() => {
   const m = store.maiaResults.find(r => r.move === props.move);
   return m ? (m.prob * 100).toFixed(1) : '0.0';
 });
 
-const sfInfo = computed(() => store.engineLines.find(l => l.pv.startsWith(props.move)));
+// 2. Делаем оценку безопасной
 const sfScore = computed(() => sfInfo.value?.score || '?.??');
+
 const sfWinrate = computed(() => {
-  if (!sfInfo.value || sfInfo.value.score.includes('#')) {
-    return sfInfo.value?.score.includes('-') ? '0' : '100';
+  const info = sfInfo.value;
+  if (!info || !info.score) return '50.0';
+
+  if (info.score.includes('#')) {
+    return info.score.includes('-') ? '0' : '100';
   }
-  const cp = parseFloat(sfInfo.value.score) * 100;
+  
+  const cp = parseFloat(info.score) * 100;
+  if (isNaN(cp)) return '50.0';
+  
   return (50 + 50 * (2 / (1 + Math.exp(-0.003682 * cp)) - 1)).toFixed(1);
 });
 
+// 3. Безопасный расчет потери оценки
 const evalLoss = computed(() => {
-  if (!sfInfo.value || store.engineLines.length === 0) return 0;
-  const bestSfScore = parseFloat(store.engineLines[0].score);
-  const currentSfScore = parseFloat(sfInfo.value.score);
+  const info = sfInfo.value;
+  const bestLine = store.engineLines.find(l => l && l.score); // Берем первую валидную линию
+
+  if (!info || !bestLine || !info.score || !bestLine.score) return 0;
+  
+  const bestSfScore = parseFloat(bestLine.score);
+  const currentSfScore = parseFloat(info.score);
+  
   if (isNaN(bestSfScore) || isNaN(currentSfScore)) return 0;
-  return Math.max(0, (bestSfScore - currentSfScore) * (store.analyzingTurn === 'w' ? 1 : -1));
+
+  // Разница в пешках. Если ход хуже лучшего, результат будет положительным.
+  const multiplier = store.analyzingTurn === 'w' ? 1 : -1;
+  const diff = (bestSfScore - currentSfScore) * multiplier;
+  
+  return Math.max(0, diff);
 });
 
 const sfScoreClass = computed(() => {
-  if (sfScore.value.startsWith('#')) return 'text-mate';
-  return parseFloat(sfScore.value) >= 0 ? 'text-plus' : 'text-minus';
+  const score = sfScore.value;
+  if (score.startsWith('#')) return 'text-mate';
+  const val = parseFloat(score);
+  if (isNaN(val)) return '';
+  return val >= 0 ? 'text-plus' : 'text-minus';
 });
 </script>
 

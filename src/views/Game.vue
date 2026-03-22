@@ -14,11 +14,14 @@
 
     <!-- Правая колонка: часы и геймпанель -->
     <div class="right-panel">
-      <ChessClock :time="opponentTime" :active="opponentActive"
-        :color="opponentColor" :player-name="opponentName" />
+      <ChessClock :time="opponentTime" :active="opponentActive" :color="opponentColor" :player-name="opponentName" />
       <GamePanel />
-      <ChessClock :time="myTime" :active="myActive"
-        :color="gameStore.myColor || 'white'" :player-name="myName" />
+      <div v-if="gameStore.status !== 'active'" class="analysis-section">
+        <button class="analyze-btn" @click="goToAnalysis">
+          <span class="icon">📊</span> Проанализировать партию
+        </button>
+      </div>
+      <ChessClock :time="myTime" :active="myActive" :color="gameStore.myColor || 'white'" :player-name="myName" />
     </div>
 
     <!-- Нижняя заглушка для мобильного -->
@@ -29,8 +32,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted,onUnmounted, computed, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { onMounted, onUnmounted, computed, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useGameStore } from '../stores/game'
 import { useSocketStore } from '../stores/socket'
 
@@ -39,6 +42,7 @@ import ChessClock from '../components/Board/ChessClock.vue'
 import GamePanel from '../components/Board/GamePanel.vue'
 
 const route = useRoute()
+const router = useRouter()
 const gameStore = useGameStore()
 const socketStore = useSocketStore()
 
@@ -53,14 +57,14 @@ onMounted(async () => {
   loadGameById(Number(route.params.id))
 })
 
-onUnmounted(async () =>{
+onUnmounted(async () => {
   gameStore.reset()
 })
 
 const myTime = computed(() => {
   if (!gameStore.clock || !gameStore.myColor) return 0
-  return gameStore.myColor === 'white' 
-    ? gameStore.clock.white * 1000 
+  return gameStore.myColor === 'white'
+    ? gameStore.clock.white * 1000
     : gameStore.clock.black * 1000
 })
 
@@ -72,14 +76,14 @@ const opponentTime = computed(() => {
 })
 const myActive = computed(() => {
   if (!gameStore.clock?.running || !gameStore.liveFen || !gameStore.myColor) return false
-  
+
   const currentTurn = gameStore.liveFen.includes(' w ') ? 'white' : 'black'
   return gameStore.myColor === currentTurn
 })
 
 const opponentActive = computed(() => {
   if (!gameStore.clock?.running || !gameStore.liveFen || !gameStore.myColor) return false
-  
+
   const currentTurn = gameStore.liveFen.includes(' w ') ? 'white' : 'black'
   return gameStore.myColor !== currentTurn
 })
@@ -91,8 +95,8 @@ const opponentColor = computed(() => {
 
 const myName = computed(() => {
   if (!gameStore.myColor) return ''
-  return gameStore.myColor === 'white' 
-    ? gameStore.whitePlayer?.username 
+  return gameStore.myColor === 'white'
+    ? gameStore.whitePlayer?.username
     : gameStore.blackPlayer?.username
 })
 
@@ -102,6 +106,12 @@ const opponentName = computed(() => {
     ? gameStore.blackPlayer?.username
     : gameStore.whitePlayer?.username
 })
+
+function goToAnalysis() {
+  if (gameStore.gameId) {
+    router.push(`/analysis/${gameStore.gameId}`)
+  }
+}
 
 watch(
   () => route.params.id,
@@ -159,6 +169,41 @@ watch(
 /* Нижняя заглушка для мобильного */
 .bottom-panel {
   display: none;
+}
+
+.analysis-section {
+  margin: 8px 0;
+  animation: fadeIn 0.5s ease-out;
+}
+
+.analyze-btn {
+  width: 100%;
+  padding: 12px;
+  background: #4a6fa5;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: background 0.2s;
+}
+
+.analyze-btn:hover {
+  background: #5d82b8;
+}
+
+.analyze-btn .icon {
+  font-size: 20px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* Адаптив для экранов <= 1024px */

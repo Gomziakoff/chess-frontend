@@ -8,6 +8,7 @@ import Login from '../views/Login.vue'
 import Test from '../views/Test.vue'
 import Analysis from '../views/Analysis.vue'
 import { useAuthStore } from '../stores/auth'
+import AnalysisId from '../views/AnalysisId.vue'
 
 const routes = [
   {
@@ -40,6 +41,12 @@ const routes = [
     path: '/watch/:id',
     name: 'Watch',
     component: Watch,
+    props: true,
+  },
+  {
+    path: '/analysis/:id',
+    name: 'AnalysisId',
+    component: AnalysisId,
     props: true,
   },
   {
