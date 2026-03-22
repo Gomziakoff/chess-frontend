@@ -27,13 +27,22 @@
 
     <!-- ПРАВАЯ ПАНЕЛЬ: Инструменты анализа -->
     <div class="right-panel">
-      <!-- Блок движка -->
+      
+      <!-- Блок движка (Расширен новым компонентом) -->
       <div class="engine-section">
         <EngineOutput 
-    :lines="analysisStore.engineLines"
-    :is-thinking="analysisStore.isThinking"
-    :depth="analysisStore.depth"
-  />
+          :lines="analysisStore.engineLines"
+          :is-thinking="analysisStore.isThinking"
+          :depth="analysisStore.depth"
+        />
+
+        <!-- ВСТАВКА: Пояснение позиции (аккуратно вписано в блок движка) -->
+        <PositionDescription 
+          v-if="analysisStore.engineLines.length > 0"
+          :segments="descriptionSegments"
+          @make-move="onUserMove"
+        />
+
         <div class="engine-footer">
           <button 
             class="toggle-analysis-btn" 
@@ -45,7 +54,7 @@
         </div>
       </div>
 
-      <!-- Список ходов -->
+      <!-- Список ходов (Остается на своем месте) -->
       <div class="moves-section">
         <MovesList 
           :moves="analysisStore.history" 
@@ -58,7 +67,7 @@
         />
       </div>
       
-      <!-- Ваш контроллер доски -->
+      <!-- Контроллер доски (Остается внизу) -->
       <div class="controller-section">
         <BoardController 
           :has-previous="analysisStore.currentStepIndex > -1"
@@ -81,12 +90,39 @@ import ChessBoard from '../components/Board/ChessBoard.vue';
 import EvalBar from '../components/Analysis/EvalBar.vue';
 import EngineOutput from '../components/Analysis/EngineOutput.vue';
 import MovesList from '../components/Board/MovesList.vue';
-import BoardController from '../components/Board/BoardController.vue'; // Импорт контроллера
+import BoardController from '../components/Board/BoardController.vue';
+import PositionDescription from '../components/Analysis/PositionDescription.vue'; // Импорт компонента
 import { useAnalysisStore } from '../stores/analysis';
+import { describePosition } from '../lib/engine/describer'; // Импорт логики описания
 
 const analysisStore = useAnalysisStore();
 
-// Логика стрелки "хода из истории"
+// Логика формирования текстовых сегментов для PositionDescription
+const descriptionSegments = computed(() => {
+  const evals: Record<string, number> = {};
+  
+  // Собираем данные из MultiPV линий
+  analysisStore.engineLines.forEach(line => {
+    const firstMove = line.pv.split(' ')[0];
+    if (firstMove) {
+      let score = parseFloat(line.score);
+      // Обработка матов для корректной сортировки в describer
+      if (line.score.includes('#')) {
+        score = line.score.includes('-') ? -1000 : 1000;
+      } else {
+        score = Math.round(score * 100);
+      }
+      evals[firstMove] = score;
+    }
+  });
+
+  return describePosition(
+    analysisStore.currentFen,
+    evals,
+    analysisStore.analyzingTurn === 'w'
+  ).segments;
+});
+
 const nextMoveInHistory = computed(() => {
   const nextStep = analysisStore.history[analysisStore.currentStepIndex + 1];
   return nextStep ? nextStep.uci : null;
@@ -105,7 +141,6 @@ function toggleAnalysis() {
 }
 
 function onResignClick() {
-  // В режиме анализа кнопка Resign может очищать доску или просто ничего не делать
   if (confirm('Очистить анализ и начать заново?')) {
     analysisStore.initNewGame();
   }
@@ -118,6 +153,8 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* Стили остаются без изменений, добавляем только косметику для нового блока */
+
 .analysis-layout {
   display: flex;
   justify-content: center;
@@ -130,16 +167,14 @@ onMounted(() => {
   box-sizing: border-box;
 }
 
-/* EvalBar слева */
 .left-panel {
   width: 35px;
-  height: 600px; /* Фиксируем под размер доски */
+  height: 600px;
 }
 .eval-wrapper {
   height: 100%;
 }
 
-/* Доска в центре */
 .center-panel {
   flex: 0 1 600px;
 }
@@ -149,7 +184,6 @@ onMounted(() => {
   box-shadow: 0 8px 24px rgba(0,0,0,0.4);
 }
 
-/* Правая колонка */
 .right-panel {
   width: 380px;
   height: 600px;
@@ -163,6 +197,17 @@ onMounted(() => {
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Стилизация PositionDescription внутри блока движка */
+:deep(.description-box) {
+  border-top: 1px solid #333;
+  border-bottom: 1px solid #333;
+  background: #2a2825;
+  padding: 10px;
+  font-size: 13px;
 }
 
 .engine-footer {
@@ -196,7 +241,6 @@ onMounted(() => {
   border: 1px solid #333;
 }
 
-/* Секция с кнопками контроллера */
 .controller-section {
   background: #262421;
   padding: 12px;
@@ -204,12 +248,10 @@ onMounted(() => {
   border: 1px solid #333;
 }
 
-/* Скрываем кнопку resign в контроллере (опционально) */
 :deep(.controller button:last-child) {
   display: none; 
 }
 
-/* Адаптив */
 @media (max-width: 1024px) {
   .analysis-layout {
     flex-direction: column;
@@ -217,7 +259,7 @@ onMounted(() => {
     height: auto;
   }
   .left-panel {
-    display: none; /* Или можно сделать горизонтальным над доской */
+    display: none;
   }
   .right-panel {
     width: 100%;
