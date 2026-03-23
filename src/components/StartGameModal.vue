@@ -50,15 +50,35 @@
                     <input type="range" min="0" max="30" v-model="increment" class="glass-range" />
                 </div>
 
-                <!-- Difficulty -->
-                <div class="control">
-                    <label>Сложность бота</label>
-                    <select v-model="difficulty" class="glass-select">
-                        <option value="easy">Лёгкий</option>
-                        <option value="medium">Средний</option>
-                        <option value="hard">Сложный</option>
-                    </select>
-                </div>
+                <!-- Engine Selection -->
+    <div class="control">
+        <label>Движок</label>
+        <div class="mode-switch">
+            <button class="glass-button" :class="{ active: engine === 'maia' }" @click="engine = 'maia'">
+                Maia (Human-like)
+            </button>
+            <button class="glass-button" :class="{ active: engine === 'stockfish' }" @click="engine = 'stockfish'">
+                Stockfish
+            </button>
+        </div>
+    </div>
+
+    <!-- Difficulty (Показываем только для Stockfish или адаптируем для Maia) -->
+    <div class="control">
+        <label>{{ engine === 'maia' ? 'Уровень (Elo)' : 'Сложность Stockfish' }}</label>
+        <select v-model="difficulty" class="glass-select">
+            <template v-if="engine === 'stockfish'">
+                <option value="easy">Лёгкий</option>
+                <option value="medium">Средний</option>
+                <option value="hard">Сложный</option>
+            </template>
+            <template v-else>
+                <option value="easy">Maia 1100</option>
+                <option value="medium">Maia 1500</option>
+                <option value="hard">Maia 1900</option>
+            </template>
+        </select>
+    </div>
 
                 <!-- Color -->
                 <div class="color-select">
@@ -88,6 +108,8 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSocketStore } from '../stores/socket'
 import { useAuthStore } from '../stores/auth'
+import { useBotGameStore } from '../stores/botGame'
+const botStore = useBotGameStore()
 
 const emit = defineEmits<{
   (e: 'close'): void
@@ -167,18 +189,21 @@ const onSeekStopped = () => {
     isSearching.value = false
     activePreset.value = null
 }
+const engine = ref<"stockfish" | "maia">("maia")
 
 function startGame() {
     if (mode.value === "online") {
         // ничего не делаем, поиск уже идёт через пресеты
     } else {
-        console.log("Start BOT game", {
-            time: time.value,
+        botStore.setupGame({
+            engine: engine.value,
+            difficulty: difficulty.value as any,
+            timeLimit: time.value,
             increment: increment.value,
-            difficulty: difficulty.value,
             color: color.value,
-        })
-        // здесь будет запуск игры с ботом
+        });
+        emit('close');
+        router.push('/game/bot');
     }
 }
 

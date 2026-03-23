@@ -16,10 +16,13 @@
         <span class="icon">🔍</span>
         <span class="label">АНАЛИЗ</span>
       </router-link>
-      <router-link to="/tournaments" class="glass-button">
-        <span class="icon">👥</span>
-        <span class="label">ТУРНИРЫ</span>
-      </router-link>
+      <router-link to="/tournaments" class="glass-button ribbon-container">
+  <!-- Лента -->
+  <div class="ribbon">В РАЗРАБОТКЕ</div>
+  
+  <span class="icon">👥</span>
+  <span class="label">ТУРНИРЫ</span>
+</router-link>
       <router-link to="/openings" class="glass-button">
         <span class="icon">📘</span>
         <span class="label">ДЕБЮТЫ</span>
@@ -256,5 +259,52 @@ function openGameModal() {
 .glass-button:focus-visible {
   outline: 2px solid white;
   outline-offset: 2px;
+}
+
+.ribbon-container {
+  position: relative;
+  overflow: hidden; /* Обрезает вылетающую ленту */
+}
+
+/* Сама лента */
+.ribbon {
+  position: absolute;
+  top: 18px;
+  right: -32px;
+  width: 130px;
+  background: rgba(255, 174, 0, 0.8); /* Золотисто-оранжевый в стиле glass */
+  color: #000;
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-align: center;
+  padding: 4px 0;
+  transform: rotate(45deg); /* Поворот ленты */
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  letter-spacing: 0.5px;
+  z-index: 1;
+  pointer-events: none; /* Чтобы лента не мешала клику */
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Адаптация ленты под маленькие мобильные экраны */
+@media (max-width: 480px) {
+  .ribbon {
+    top: 10px;
+    right: -35px;
+    font-size: 0.5rem;
+    width: 110px;
+  }
+}
+
+/* Делаем кнопку турниров визуально "выключенной" (опционально) */
+.ribbon-container {
+  opacity: 0.9;
+  cursor: default;
+}
+
+.ribbon-container:hover {
+  /* Если хотите, чтобы она не двигалась при наведении, пока в разработке: */
+  /* transform: none; */
 }
 </style>

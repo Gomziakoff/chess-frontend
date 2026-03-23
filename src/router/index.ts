@@ -1,81 +1,98 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory } from "vue-router";
 
-import Main from '../views/Main.vue'
-import Lobby from '../views/Lobby.vue'
-import Game from '../views/Game.vue'
-import Watch from '../views/Watch.vue'
-import Login from '../views/Login.vue'
-import Test from '../views/Test.vue'
-import Analysis from '../views/Analysis.vue'
-import { useAuthStore } from '../stores/auth'
-import AnalysisId from '../views/AnalysisId.vue'
-import HumanityAnalysis from '../views/HumanityAnalysis.vue'
+import Main from "../views/Main.vue";
+import Lobby from "../views/Lobby.vue";
+import Game from "../views/Game.vue";
+import Watch from "../views/Watch.vue";
+import Login from "../views/Login.vue";
+import Test from "../views/Test.vue";
+import Analysis from "../views/Analysis.vue";
+import { useAuthStore } from "../stores/auth";
+import AnalysisId from "../views/AnalysisId.vue";
+import HumanityAnalysis from "../views/HumanityAnalysis.vue";
+import BotGame from "../views/BotGame.vue";
 
 const routes = [
   {
-    path: '/',
-    name: 'Main',
+    path: "/",
+    name: "Main",
     component: Main,
   },
   {
-    path: '/test',
-    name: 'Test',
+    path: "/test",
+    name: "Test",
     component: Test,
   },
   {
-    path: '/analysis',
-    name: 'Analysis',
+    path: "/analysis",
+    name: "Analysis",
     component: Analysis,
   },
   {
-    path: '/lobby',
-    name: 'Lobby',
+    path: "/lobby",
+    name: "Lobby",
     component: Lobby,
   },
   {
-    path: '/bot',
-    name: 'Bot',
+    path: "/game/bot",
+    name: "GameBot",
+    component: BotGame,
+  },
+  {
+    path: "/bot",
+    name: "Bot",
     component: HumanityAnalysis,
   },
   {
-    path: '/game/:id',
-    name: 'Game',
+    path: "/game/:id",
+    name: "Game",
     component: Game,
     props: true,
   },
   {
-    path: '/watch/:id',
-    name: 'Watch',
+    path: "/watch/:id",
+    name: "Watch",
     component: Watch,
     props: true,
   },
   {
-    path: '/analysis/:id',
-    name: 'AnalysisId',
+    path: "/analysis/:id",
+    name: "AnalysisId",
     component: AnalysisId,
     props: true,
   },
   {
-  path: '/login',
-  component: Login
+    path: "/login",
+    component: Login,
   },
-]
+  {
+    path: "/:pathMatch(.*)*",
+    name: "NotFound",
+    component: () => import("../views/ErrorPage.vue"),
+    props: {
+      code: "404",
+      title: "Позиция не найдена",
+      message:
+        "Этот вариант не предусмотрен теорией. Похоже, вы зашли на несуществующую клетку.",
+    },
+  },
+];
 
 export const router = createRouter({
   history: createWebHistory(),
   routes,
-})
+});
 
 router.beforeEach(async (to, from, next) => {
-  const auth = useAuthStore()
+  const auth = useAuthStore();
 
   if (!auth.user) {
-    await auth.fetchMe()
+    await auth.fetchMe();
   }
 
-  if (to.path !== '/login' && !auth.isAuthenticated) {
-    return next('/login')
+  if (to.path !== "/login" && !auth.isAuthenticated) {
+    return next("/login");
   }
 
-  next()
-})
+  next();
+});
