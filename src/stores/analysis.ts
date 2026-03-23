@@ -3,6 +3,7 @@ import { Chess } from "chess.js";
 import Maia from "../lib/engine/maia";
 import { classifyMove, type MoveClassification } from "../lib/engine/describer";
 import { http } from "../api/http";
+import {Pgn} from "cm-pgn"
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -19,6 +20,9 @@ interface AnalysisStep {
   uci: string;
   ply: number;
   classification?: MoveClassification;
+  maiaProb?: number; 
+  sfRank?: number;
+  isSuspicious?: boolean;
 }
 
 interface MaiaResult {
@@ -49,8 +53,8 @@ export const useAnalysisStore = defineStore("analysis", {
     config: {
       threads: 4,
       hash: 64,
-      multiPv: 4,
-      depth: 20,
+      multiPv: 20,
+      depth: 24,
     },
 
     maiaInstance: null as Maia | null,
@@ -77,6 +81,107 @@ export const useAnalysisStore = defineStore("analysis", {
   },
 
   actions: {
+
+  loadPgn(pgnStr: string) {
+      this.pgnError = null;
+      try {
+        // 1. Инициализируем cm-pgn
+        const pgn = new Pgn(pgnStr);
+
+        // 2. Проверяем наличие истории ходов (согласно вашей доке: pgn.history.moves)
+        if (
+          !pgn.history ||
+          !pgn.history.moves ||
+          pgn.history.moves.length === 0
+        ) {
+          this.pgnError = "В предоставленном PGN не найдено ходов.";
+          return false;
+        }
+
+        // 3. Маппим данные.
+        // ВАЖНО: Никаких .notation! Используем move.san и move.uci напрямую.
+        this.history = pgn.history.moves.map((move: any) => ({
+          fen: move.fen, // FEN после этого хода
+          san: move.san, // SAN нотация (например "e4")
+          uci: move.uci, // UCI нотация (например "e2e4")
+          ply: move.ply, // Номер полухода
+          sfRank: undefined,
+          maiaProb: undefined,
+          isSuspicious: undefined,
+        }));
+
+        // 4. Устанавливаем начальный FEN из тегов или по умолчанию
+        this.initialFen = pgn.header.tags.FEN || START_FEN;
+
+        // 5. Синхронизируем шахматную логику (chess.js) для корректного отображения
+        if (this.history.length > 0) {
+          this.currentStepIndex = this.history.length - 1;
+          const lastFen = this.history[this.currentStepIndex].fen;
+          this.chess.load(lastFen);
+        } else {
+          this.currentStepIndex = -1;
+          this.chess.load(this.initialFen);
+        }
+
+        console.log(`Успешно загружено ${this.history.length} ходов.`);
+        return true;
+      } catch (e: any) {
+        console.error("Критическая ошибка cm-pgn:", e);
+        // Если парсер библиотеки выкинет ошибку, мы запишем её текст
+        this.pgnError = "Ошибка парсинга: " + (e.message || "Некорректный PGN");
+        return false;
+      }
+    },
+
+    async runHumanityAnalysis() {
+  if (this.history.length === 0 || !this.maiaInstance || this.maiaStatus !== 'ready') return;
+  this.isFullAnalysisRunning = true;
+
+  for (let i = 0; i < this.history.length; i++) {
+    const step = this.history[i];
+    const fenBefore = i === 0 ? this.initialFen : this.history[i - 1].fen;
+
+    try {
+      const result = await this.maiaInstance.evaluate(fenBefore, this.maiaElo, this.maiaElo);
+      const prob = result.policy[step.uci] || 0;
+      const mProb = Math.round(prob * 100);
+
+      // --- НОВАЯ ЛОГИКА ПОДОЗРИТЕЛЬНОСТИ ---
+      let suspicious = false;
+
+      // 1. Если это лучший ход движка, и человек играет так реже чем в 10% случаев
+      if (step.sfRank === 1 && mProb < 10) suspicious = true;
+      
+      // 2. Если это ход из Топ-3 движка, но человек играет его крайне редко (меньше 3%)
+      if (step.sfRank >= 2 && step.sfRank <= 3 && mProb < 3) suspicious = true;
+
+      // 3. Если ход вообще не в топе Maia (0%), но это отличный ход по SF (Top-4)
+      if (step.sfRank >= 1 && step.sfRank <= 4 && mProb === 0) suspicious = true;
+
+      this.history[i] = {
+        ...step,
+        maiaProb: mProb,
+        isSuspicious: suspicious
+      };
+      
+      this.history = [...this.history]; // Для реактивности
+
+    } catch (e) { console.error(e); }
+
+    this.fullAnalysisProgress = Math.round(((i + 1) / this.history.length) * 100);
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  this.isFullAnalysisRunning = false;
+},
+
+    // Вспомогательная функция для обновления sfRank в реальном времени
+    updateStepSfRank(index: number) {
+      const step = this.history[index];
+      if (this.engineLines.length > 0) {
+        const moveIndex = this.engineLines.findIndex(l => l.pv.startsWith(step.uci));
+        step.sfRank = moveIndex !== -1 ? moveIndex + 1 : 0;
+      }
+    },
     // --- Логика шахматных ходов ---
 
     initNewGame() {
@@ -227,43 +332,40 @@ export const useAnalysisStore = defineStore("analysis", {
     },
 
     classifyHistoryStep(index: number) {
-      const step = this.history[index];
-      const prevStepFen = index === 0 ? this.initialFen : this.history[index - 1].fen;
-      const turn = prevStepFen.split(" ")[1]; // Кто ходил в этой позиции?
-      const multiplier = turn === "w" ? 1 : -1;
+  const step = this.history[index];
+  const prevStepFen = index === 0 ? this.initialFen : this.history[index - 1].fen;
+  const turn = prevStepFen.split(" ")[1];
+  const multiplier = turn === "w" ? 1 : -1;
 
-      if (this.engineLines.length > 0) {
-        const bestLine = this.engineLines[0];
-        
-        // Вспомогательная функция парсинга (скопируйте из вашего makeMove или вынесите)
-        const parseScore = (scoreStr: string): number => {
-          if (scoreStr.includes("#")) {
-            const mateIn = parseInt(scoreStr.replace("#", ""));
-            return mateIn > 0 ? 10000 - mateIn : -10000 + Math.abs(mateIn);
-          }
-          return parseFloat(scoreStr) * 100;
-        };
+  if (this.engineLines.length > 0) {
+    const bestLine = this.engineLines[0];
+    const parseScore = (s: string): number => {
+      if (s.includes("#")) return s.includes("-") ? -10000 : 10000;
+      return parseFloat(s) * 100;
+    };
 
-        const bestEval = parseScore(bestLine.score) * multiplier;
-        const bestUci = bestLine.pv.split(" ")[0];
+    const bestEval = parseScore(bestLine.score) * multiplier;
+    
+    // Вычисляем ранг
+    const moveIndex = this.engineLines.findIndex(l => l.pv.startsWith(step.uci));
+    const sfRank = moveIndex !== -1 ? moveIndex + 1 : 0;
+    
+    let classification: MoveClassification = 'inaccuracy';
+    if (sfRank === 1) {
+      classification = 'best';
+    } else if (moveIndex !== -1) {
+      const moveEval = parseScore(this.engineLines[moveIndex].score) * multiplier;
+      classification = classifyMove(moveEval, bestEval, bestEval);
+    }
 
-        if (step.uci === bestUci) {
-          step.classification = 'best';
-        } else {
-          // Для оценки хода из истории, которого нет в текущем MultiPV движка,
-          // мы можем только предполагать его точность или запустить доп. поиск.
-          // Но для "быстрого" анализа возьмем ближайшую линию:
-          const moveLine = this.engineLines.find(l => l.pv.startsWith(step.uci));
-          if (moveLine) {
-            const moveEval = parseScore(moveLine.score) * multiplier;
-            step.classification = classifyMove(moveEval, bestEval, bestEval);
-          } else {
-            // Если хода нет в ТОП-4, помечаем как неточность/ошибку
-            step.classification = 'inaccuracy'; 
-          }
-        }
-      }
-    },
+    // ВАЖНО: Обновляем объект целиком для реактивности
+    this.history[index] = {
+      ...step,
+      sfRank,
+      classification
+    };
+  }
+},
 
     async loadGameById(id: number) {
       try {

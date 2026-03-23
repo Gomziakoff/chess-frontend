@@ -9,6 +9,7 @@ import Test from '../views/Test.vue'
 import Analysis from '../views/Analysis.vue'
 import { useAuthStore } from '../stores/auth'
 import AnalysisId from '../views/AnalysisId.vue'
+import HumanityAnalysis from '../views/HumanityAnalysis.vue'
 
 const routes = [
   {
@@ -30,6 +31,11 @@ const routes = [
     path: '/lobby',
     name: 'Lobby',
     component: Lobby,
+  },
+  {
+    path: '/bot',
+    name: 'Bot',
+    component: HumanityAnalysis,
   },
   {
     path: '/game/:id',

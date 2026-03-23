@@ -13,6 +13,7 @@
     "chess.js": "^1.4.0",
     "chess.ts": "^0.16.2",
     "chessground": "^9.2.1",
+    "cm-pgn": "^4.0.6",
     "lila-stockfish-web": "^0.0.11",
     "onnxruntime-web": "^1.24.3",
     "pinia": "^3.0.4",
