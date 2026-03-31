@@ -53,8 +53,8 @@ export const useAnalysisStore = defineStore("analysis", {
     config: {
       threads: 4,
       hash: 64,
-      multiPv: 20,
-      depth: 24,
+      multiPv: 8,
+      depth: 12,
     },
 
     maiaInstance: null as Maia | null,

@@ -17,19 +17,20 @@
         <span class="label">АНАЛИЗ</span>
       </router-link>
       <router-link to="/tournaments" class="glass-button ribbon-container">
-  <!-- Лента -->
-  <div class="ribbon">В РАЗРАБОТКЕ</div>
-  
-  <span class="icon">👥</span>
-  <span class="label">ТУРНИРЫ</span>
-</router-link>
-      <router-link to="/openings" class="glass-button">
+        <!-- Лента -->
+        <div class="ribbon">В РАЗРАБОТКЕ</div>
+
+        <span class="icon">👥</span>
+        <span class="label">ТУРНИРЫ</span>
+      </router-link>
+      <router-link to="/openings" class="glass-button ribbon-container">
+        <div class="ribbon">В РАЗРАБОТКЕ</div>
         <span class="icon">📘</span>
         <span class="label">ДЕБЮТЫ</span>
       </router-link>
       <router-link to="/puzzles" class="glass-button">
         <span class="icon">🧩</span>
-        <span class="label">ПАЗЛЫ</span>
+        <span class="label">ЗАДАЧИ</span>
       </router-link>
       <router-link to="/bot" class="glass-button">
         <span class="icon">🤖</span>
@@ -108,7 +109,8 @@ function openGameModal() {
   width: 140px;
   height: 140px;
   padding: 0;
-  background: rgba(255, 255, 255, 0.1); /* Чуть прозрачнее для лучшего сочетания с темным фоном */
+  background: rgba(255, 255, 255, 0.1);
+  /* Чуть прозрачнее для лучшего сочетания с темным фоном */
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.15);
@@ -119,7 +121,7 @@ function openGameModal() {
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
   flex-shrink: 0;
   flex-grow: 0;
-  
+
   /* Убираем стандартные стили ссылок */
   text-decoration: none;
   outline: none;
@@ -263,7 +265,8 @@ function openGameModal() {
 
 .ribbon-container {
   position: relative;
-  overflow: hidden; /* Обрезает вылетающую ленту */
+  overflow: hidden;
+  /* Обрезает вылетающую ленту */
 }
 
 /* Сама лента */
@@ -272,17 +275,20 @@ function openGameModal() {
   top: 18px;
   right: -32px;
   width: 130px;
-  background: rgba(255, 174, 0, 0.8); /* Золотисто-оранжевый в стиле glass */
+  background: rgba(255, 174, 0, 0.8);
+  /* Золотисто-оранжевый в стиле glass */
   color: #000;
   font-size: 0.65rem;
   font-weight: 800;
   text-align: center;
   padding: 4px 0;
-  transform: rotate(45deg); /* Поворот ленты */
+  transform: rotate(45deg);
+  /* Поворот ленты */
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   letter-spacing: 0.5px;
   z-index: 1;
-  pointer-events: none; /* Чтобы лента не мешала клику */
+  pointer-events: none;
+  /* Чтобы лента не мешала клику */
   backdrop-filter: blur(5px);
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
