@@ -23,8 +23,7 @@
         <span class="icon">👥</span>
         <span class="label">ТУРНИРЫ</span>
       </router-link>
-      <router-link to="/openings" class="glass-button ribbon-container">
-        <div class="ribbon">В РАЗРАБОТКЕ</div>
+      <router-link to="/openings" class="glass-button">
         <span class="icon">📘</span>
         <span class="label">ДЕБЮТЫ</span>
       </router-link>

@@ -12,6 +12,7 @@ import AnalysisId from "../views/AnalysisId.vue";
 import HumanityAnalysis from "../views/HumanityAnalysis.vue";
 import BotGame from "../views/BotGame.vue";
 import Profile from "../views/Profile.vue";
+import OpeningDrill from "../views/OpeningDrill.vue";
 
 const routes = [
   {
@@ -33,6 +34,11 @@ const routes = [
     path: "/analysis",
     name: "Analysis",
     component: Analysis,
+  },
+  {
+    path: "/openings",
+    name: "Openings",
+    component: OpeningDrill,
   },
   {
     path: "/lobby",
