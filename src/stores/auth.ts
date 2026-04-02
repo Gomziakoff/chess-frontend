@@ -1,9 +1,23 @@
 import { defineStore } from 'pinia'
 import { http } from '../api/http'
 
-interface User {
+export interface User {
   Id: number
   Username: string
+  Email: string
+  EloClassical: number
+  EloRapid: number
+  EloBlitz: number
+  EloBullet: number
+  GamesClassical: number
+  GamesRapid: number
+  GamesBlitz: number
+  GamesBullet: number
+  AvatarURL: string
+  Title: string
+  Country: string
+  Role: string
+  CreatedAt: string
 }
 
 export const useAuthStore = defineStore('auth', {

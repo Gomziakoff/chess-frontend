@@ -11,13 +11,18 @@ import { useAuthStore } from "../stores/auth";
 import AnalysisId from "../views/AnalysisId.vue";
 import HumanityAnalysis from "../views/HumanityAnalysis.vue";
 import BotGame from "../views/BotGame.vue";
-import Puzzle from "../views/Puzzle.vue";
+import Profile from "../views/Profile.vue";
 
 const routes = [
   {
     path: "/",
     name: "Main",
     component: Main,
+  },
+  {
+    path: "/profile",
+    name: "Profile",
+    component: Profile,
   },
   {
     path: "/test",

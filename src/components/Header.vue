@@ -10,7 +10,7 @@
                 <button class="nav-link active" @click="openGameModal">
                     ИГРА
                 </button>
-                <a href="#" class="nav-link">ЗАДАЧИ</a>
+                <a href="/puzzles" class="nav-link">ЗАДАЧИ</a>
                 <a href="#" class="nav-link">ДЕБЮТЫ</a>
                 <a href="#" class="nav-link">ПРОСМОТР</a>
                 <a href="/analysis" class="nav-link">АНАЛИЗ</a>

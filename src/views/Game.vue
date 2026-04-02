@@ -2,8 +2,18 @@
   <div class="game-layout" :key="$route.fullPath">
     <!-- Левая колонка (карточки игроков / заглушка) -->
     <div class="left-panel">
-      <div class="player-card">White Player</div>
-      <div class="player-card">Black Player</div>
+      <PlayerCard 
+        :player="topPlayer" 
+        :is-turn="isTopPlayerTurn"
+        :rating-diff="getRatingDiff(topPlayer?.color)"
+      />
+      
+      <!-- Игрок снизу (вы при обычной ориентации) -->
+      <PlayerCard 
+        :player="bottomPlayer" 
+        :is-turn="isBottomPlayerTurn"
+        :rating-diff="getRatingDiff(bottomPlayer?.color)"
+      />
     </div>
 
     <!-- Центр: шахматная доска -->
@@ -40,6 +50,7 @@ import { useSocketStore } from '../stores/socket'
 import ChessBoard from '../components/Board/ChessBoard.vue'
 import ChessClock from '../components/Board/ChessClock.vue'
 import GamePanel from '../components/Board/GamePanel.vue'
+import PlayerCard from '../components/Board/PlayerCard.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -120,6 +131,34 @@ watch(
     loadGameById(Number(newId))
   }
 )
+
+const topPlayer = computed(() => {
+  return gameStore.orientation === 'white' ? gameStore.blackPlayer : gameStore.whitePlayer
+})
+
+const bottomPlayer = computed(() => {
+  return gameStore.orientation === 'white' ? gameStore.whitePlayer : gameStore.blackPlayer
+})
+
+const isTopPlayerTurn = computed(() => {
+  if (!gameStore.fen) return false
+  const turn = gameStore.fen.split(' ')[1] // 'w' или 'b'
+  return (turn === 'w' && topPlayer.value?.color === 'white') || 
+         (turn === 'b' && topPlayer.value?.color === 'black')
+})
+
+const isBottomPlayerTurn = computed(() => {
+  if (!gameStore.fen) return false
+  const turn = gameStore.fen.split(' ')[1]
+  return (turn === 'w' && bottomPlayer.value?.color === 'white') || 
+         (turn === 'b' && bottomPlayer.value?.color === 'black')
+})
+
+function getRatingDiff(color?: string) {
+  if (gameStore.status !== 'finished' || !gameStore.ratingDiff || !color) return null
+  // ratingDiff обычно объект { white: +10, black: -10 } или подобное
+  return color === 'white' ? gameStore.ratingDiff.white : gameStore.ratingDiff.black
+}
 </script>
 
 <style scoped>
