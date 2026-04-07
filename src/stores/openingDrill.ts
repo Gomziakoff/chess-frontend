@@ -102,10 +102,19 @@ export const useOpeningDrillStore = defineStore("openingDrill", {
 
       // 2. Цикл классификации
       for (let i = 0; i < analysisStore.history.length; i++) {
-        analysisStore.goToStep(i - 1); 
-        await analysisStore.analyzeStepSequentially(i);
-        analysisStore.fullAnalysisProgress = Math.round(((i + 1) / analysisStore.history.length) * 100);
-      }
+  // 1. Определяем FEN до хода
+  const fenBefore = i === 0 
+    ? analysisStore.initialFen 
+    : analysisStore.history[i - 1].fen;
+
+  // 2. Визуально переходим на шаг назад (необязательно, но полезно для UI)
+  analysisStore.goToStep(i - 1); 
+
+  // 3. ПЕРЕДАЕМ ОБА АРГУМЕНТА (индекс и FEN)
+  await analysisStore.analyzeStepSequentially(i, fenBefore); 
+  
+  analysisStore.fullAnalysisProgress = Math.round(((i + 1) / analysisStore.history.length) * 100);
+}
 
       // 3. Снимаем блок и даем паузу для Wasm
       analysisStore.isFullAnalysisRunning = false;
