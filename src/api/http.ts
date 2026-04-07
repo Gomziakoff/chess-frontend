@@ -1,6 +1,7 @@
 import axios from 'axios'
 
 export const http = axios.create({
-  baseURL: 'http://localhost:8080/api/v1',
+  // Теперь baseURL — это просто путь на том же домене, где висит фронт
+  baseURL: '/api/v1', 
   withCredentials: true,
 })

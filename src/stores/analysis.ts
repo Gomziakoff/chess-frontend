@@ -273,92 +273,104 @@ export const useAnalysisStore = defineStore("analysis", {
     },
 
      async runFullAnalysis() {
-      if (this.history.length === 0) return;
-      
-      this.isFullAnalysisRunning = true;
-      this.fullAnalysisProgress = 0;
+  if (this.history.length === 0) return;
+  
+  this.isFullAnalysisRunning = true;
+  this.fullAnalysisProgress = 0;
 
-      // 1. Анализируем стартовую позицию
-      this.goToStep(-1); // Переставляем доску в начало
-      await this.analyzeStepSequentially(-1);
+  for (let i = 0; i < this.history.length; i++) {
+    if (!this.isFullAnalysisRunning) break;
 
-      // 2. Проходим по всем ходам
-      for (let i = 0; i < this.history.length; i++) {
-        // Проверяем, не прервал ли пользователь анализ вручную (если добавите кнопку Stop)
-        if (!this.isFullAnalysisRunning) break;
+    // ОПРЕДЕЛЯЕМ FEN ДО ХОДА
+    const fenBefore = i === 0 ? this.initialFen : this.history[i - 1].fen;
+    
+    // Устанавливаем доску в позицию ДО хода (чтобы пользователь видел, что анализируется)
+    this.chess.load(fenBefore);
+    this.currentStepIndex = i - 1; 
 
-        // ВАЖНО: Перемещаем "курсор" по истории. 
-        // Это обновит FEN на доске, и пользователь увидит ход.
-        this.goToStep(i);
+    // Ждем анализа этой позиции
+    await this.analyzeStepSequentially(i, fenBefore);
+    
+    this.fullAnalysisProgress = Math.round(((i + 1) / this.history.length) * 100);
+  }
 
-        // Ждем, пока движок обсчитает текущую позицию
-        await this.analyzeStepSequentially(i);
-        
-        // Обновляем прогресс
-        this.fullAnalysisProgress = Math.round(((i + 1) / this.history.length) * 100);
-
-        // Небольшая задержка (пауза), чтобы глаз успевал заметить ход, 
-        // если движок думает очень быстро на малой глубине
-        await new Promise(resolve => setTimeout(resolve, 300));
-      }
-
-      this.isFullAnalysisRunning = false;
-      await this.calculateGameLevel();
-    },
+  // В конце переходим на последний ход
+  this.goToStep(this.history.length - 1);
+  this.isFullAnalysisRunning = false;
+  await this.calculateGameLevel();
+},
 
     /**
      * Вспомогательный метод: ставит движок на конкретный шаг, 
      * ждет выполнения и записывает классификацию.
      */
-    async analyzeStepSequentially(index: number) {
-      // Запускаем стандартный метод анализа (он шлет команды в worker)
-      this.analyzeFen(this.chess.fen());
+    async analyzeStepSequentially(index: number, fen: string) {
+  this.analyzeFen(fen); // Запускает движок
 
-      // Ждем завершения раздумий движка
-      return new Promise<void>((resolve) => {
-        const checkInterval = setInterval(() => {
-          // Когда движок получил bestmove, он ставит isThinking = false
-          if (!this.isThinking) {
-            clearInterval(checkInterval);
-            
-            // Записываем результат классификации в историю
-            if (index >= 0) {
-              this.classifyHistoryStep(index);
-            }
-            resolve();
-          }
-        }, 30);
-      });
-    },
+  return new Promise<void>((resolve) => {
+    const checkInterval = setInterval(() => {
+      if (!this.isThinking) {
+        clearInterval(checkInterval);
+        if (index >= 0) {
+          this.classifyHistoryStep(index);
+        }
+        resolve();
+      }
+    }, 30);
+  });
+},
 
     classifyHistoryStep(index: number) {
   const step = this.history[index];
   const prevStepFen = index === 0 ? this.initialFen : this.history[index - 1].fen;
-  const turn = prevStepFen.split(" ")[1];
+  
+  // turn — это тот, кто СЕЙЧАС ходит в этой позиции (т.е. автор хода step.uci)
+  const turn = prevStepFen.split(" ")[1]; 
   const multiplier = turn === "w" ? 1 : -1;
 
   if (this.engineLines.length > 0) {
     const bestLine = this.engineLines[0];
+    
     const parseScore = (s: string): number => {
-      if (s.includes("#")) return s.includes("-") ? -10000 : 10000;
+      if (s.includes("#")) {
+        const val = parseInt(s.replace("#", ""));
+        return val > 0 ? 10000 : -10000;
+      }
       return parseFloat(s) * 100;
     };
 
+    // Оценка лучшего хода с точки зрения игрока, который ходит
     const bestEval = parseScore(bestLine.score) * multiplier;
     
-    // Вычисляем ранг
+    // Ищем, какой ранг у нашего реального хода в текущем анализе
+    // Используем startsWith, так как PV может содержать цепочку ходов
     const moveIndex = this.engineLines.findIndex(l => l.pv.startsWith(step.uci));
     const sfRank = moveIndex !== -1 ? moveIndex + 1 : 0;
     
     let classification: MoveClassification = 'inaccuracy';
+    let moveEval = 0;
+
     if (sfRank === 1) {
       classification = 'best';
+      moveEval = bestEval;
     } else if (moveIndex !== -1) {
-      const moveEval = parseScore(this.engineLines[moveIndex].score) * multiplier;
+      moveEval = parseScore(this.engineLines[moveIndex].score) * multiplier;
       classification = classifyMove(moveEval, bestEval, bestEval);
+    } else {
+      // Хода нет в MultiPV (топ-4/8)
+      // Считаем, что он как минимум хуже худшей линии
+      const worstLine = this.engineLines[this.engineLines.length - 1];
+      const worstEval = parseScore(worstLine.score) * multiplier;
+      moveEval = worstEval - 50; 
+      classification = classifyMove(moveEval, bestEval, bestEval);
+      
+      // Страховка: если ход не в топе, он не может быть "лучшим"
+      if (classification === 'best' || classification === 'excellent') {
+        classification = 'inaccuracy';
+      }
     }
 
-    // ВАЖНО: Обновляем объект целиком для реактивности
+    // Сохраняем данные
     this.history[index] = {
       ...step,
       sfRank,

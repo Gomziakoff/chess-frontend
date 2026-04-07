@@ -25,15 +25,15 @@ export const useSocketStore = defineStore("socket", {
       let url = "";
 
       if (mode === "lobby") {
-        url = "ws://localhost:8080/api/v1/ws";
+        url = "/api/v1/ws";
       }
 
       if (mode === "game") {
-        url = `ws://localhost:8080/api/v1/ws/game/${gameId}`;
+        url = `/api/v1/ws/game/${gameId}`;
       }
 
       if (mode === "watch") {
-        url = `ws://localhost:8080/api/v1/ws/watch/${gameId}`;
+        url = `/api/v1/ws/watch/${gameId}`;
       }
 
       const ws = new WebSocket(url);
