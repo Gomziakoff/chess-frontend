@@ -4,6 +4,10 @@ import { InferenceSession, Tensor, env } from 'onnxruntime-web'
 import { mirrorMove, preprocess, allPossibleMovesReversed } from './tensor'
 import { MaiaModelStorage } from './storage'
 
+env.wasm.numThreads = 1; // Для начала 1, чтобы избежать проблем с SharedArrayBuffer
+
+env.wasm.wasmPaths = '/onnx/';
+
 interface MaiaOptions {
   model: string
   setStatus: (status: MaiaStatus) => void

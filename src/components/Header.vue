@@ -14,7 +14,7 @@
                 <a href="/openings" class="nav-link">ДЕБЮТЫ</a>
 
                 <a href="/analysis" class="nav-link">АНАЛИЗ</a>
-                <a href="#" class="nav-link support">ПОДДЕРЖАТЬ ПРОЕКТ</a>
+                <a href="/support" class="nav-link support">ПОДДЕРЖАТЬ ПРОЕКТ</a>
             </nav>
         </div>
 

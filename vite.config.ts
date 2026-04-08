@@ -24,7 +24,7 @@ export default defineConfig({
     proxy: {
       // Обычные HTTP запросы
       '/api/v1': {
-        target: 'http://192.168.100.44:8080',
+        target: 'http://127.0.0.1:8080',
         changeOrigin: true,
         configure: (proxy, _options) => {
            // Это необязательно, но полезно для отладки
@@ -32,7 +32,7 @@ export default defineConfig({
       },
       // Настройка для WebSocket
       '/api/v1/ws': {
-        target: 'http://192.168.100.44:8080',
+        target: 'http://127.0.0.1:8080',
         ws: true, // КРИТИЧНО: включаем поддержку веб-сокетов
         changeOrigin: true,
       }

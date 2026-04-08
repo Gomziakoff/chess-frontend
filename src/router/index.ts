@@ -13,6 +13,7 @@ import HumanityAnalysis from "../views/HumanityAnalysis.vue";
 import BotGame from "../views/BotGame.vue";
 import Profile from "../views/Profile.vue";
 import OpeningDrill from "../views/OpeningDrill.vue";
+import SupportPage from "../views/SupportPage.vue";
 
 const routes = [
   {
@@ -34,6 +35,11 @@ const routes = [
     path: "/analysis",
     name: "Analysis",
     component: Analysis,
+  },
+  {
+    path: "/support",
+    name: "Support",
+    component: SupportPage,
   },
   {
     path: "/openings",

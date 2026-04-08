@@ -36,13 +36,23 @@ export const useSocketStore = defineStore("socket", {
         url = `/api/v1/ws/watch/${gameId}`;
       }
 
+      const host = window.location.host;
+
+      // Определяем протокол: если зашли по https, то используем wss, иначе ws
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+
+      const fullUrl = `${protocol}//${host}${url}`;
+
+      console.log("Connecting to WS:", fullUrl);
+
       const ws = new WebSocket(url);
 
       ws.onopen = () => {
         console.log("WS connected:", mode);
         this.connected = true;
+        this.shouldReconnect = true;
 
-        this.send({t: "ping"});
+        this.send({ t: "ping" });
         this.startPing();
       };
 
@@ -85,7 +95,7 @@ export const useSocketStore = defineStore("socket", {
 
       this.pingTimer = window.setInterval(() => {
         if (this.socket?.readyState === WebSocket.OPEN) {
-          this.send({t: "ping"}); // ← отправка null
+          this.send({ t: "ping" }); // ← отправка null
           // или this.socket.send(JSON.stringify(null));
         }
       }, 3000);
