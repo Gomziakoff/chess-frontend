@@ -17,7 +17,6 @@ export const useSocketStore = defineStore("socket", {
 
   actions: {
     connect(mode: WSMode, gameId?: number) {
-      this.disconnect();
 
       this.mode = mode;
       this.currentGameId = gameId ?? null;
@@ -45,12 +44,12 @@ export const useSocketStore = defineStore("socket", {
 
       console.log("Connecting to WS:", fullUrl);
 
-      const ws = new WebSocket(url);
+      const ws = new WebSocket(fullUrl);
 
       ws.onopen = () => {
         console.log("WS connected:", mode);
         this.connected = true;
-        this.shouldReconnect = true;
+        
 
         this.send({ t: "ping" });
         this.startPing();

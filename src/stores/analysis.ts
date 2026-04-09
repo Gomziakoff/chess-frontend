@@ -3,7 +3,7 @@ import { Chess } from "chess.js";
 import Maia from "../lib/engine/maia";
 import { classifyMove, type MoveClassification } from "../lib/engine/describer";
 import { http } from "../api/http";
-import {Pgn} from "cm-pgn"
+import { Pgn } from "cm-pgn"
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -20,7 +20,7 @@ interface AnalysisStep {
   uci: string;
   ply: number;
   classification?: MoveClassification;
-  maiaProb?: number; 
+  maiaProb?: number;
   sfRank?: number;
   isSuspicious?: boolean;
 }
@@ -72,6 +72,9 @@ export const useAnalysisStore = defineStore("analysis", {
     },
     isCalculatingSummary: false,
     summaryProgress: 0,
+
+    engineReadyPromise: null as Promise<void> | null,
+    engineReadyResolve: null as (() => void) | null,
   }),
 
   getters: {
@@ -82,7 +85,7 @@ export const useAnalysisStore = defineStore("analysis", {
 
   actions: {
 
-  loadPgn(pgnStr: string) {
+    loadPgn(pgnStr: string) {
       this.pgnError = null;
       try {
         // 1. Инициализируем cm-pgn
@@ -134,45 +137,45 @@ export const useAnalysisStore = defineStore("analysis", {
     },
 
     async runHumanityAnalysis() {
-  if (this.history.length === 0 || !this.maiaInstance || this.maiaStatus !== 'ready') return;
-  this.isFullAnalysisRunning = true;
+      if (this.history.length === 0 || !this.maiaInstance || this.maiaStatus !== 'ready') return;
+      this.isFullAnalysisRunning = true;
 
-  for (let i = 0; i < this.history.length; i++) {
-    const step = this.history[i];
-    const fenBefore = i === 0 ? this.initialFen : this.history[i - 1].fen;
+      for (let i = 0; i < this.history.length; i++) {
+        const step = this.history[i];
+        const fenBefore = i === 0 ? this.initialFen : this.history[i - 1].fen;
 
-    try {
-      const result = await this.maiaInstance.evaluate(fenBefore, this.maiaElo, this.maiaElo);
-      const prob = result.policy[step.uci] || 0;
-      const mProb = Math.round(prob * 100);
+        try {
+          const result = await this.maiaInstance.evaluate(fenBefore, this.maiaElo, this.maiaElo);
+          const prob = result.policy[step.uci] || 0;
+          const mProb = Math.round(prob * 100);
 
-      // --- НОВАЯ ЛОГИКА ПОДОЗРИТЕЛЬНОСТИ ---
-      let suspicious = false;
+          // --- НОВАЯ ЛОГИКА ПОДОЗРИТЕЛЬНОСТИ ---
+          let suspicious = false;
 
-      // 1. Если это лучший ход движка, и человек играет так реже чем в 10% случаев
-      if (step.sfRank === 1 && mProb < 10) suspicious = true;
-      
-      // 2. Если это ход из Топ-3 движка, но человек играет его крайне редко (меньше 3%)
-      if (step.sfRank >= 2 && step.sfRank <= 3 && mProb < 3) suspicious = true;
+          // 1. Если это лучший ход движка, и человек играет так реже чем в 10% случаев
+          if (step.sfRank === 1 && mProb < 10) suspicious = true;
 
-      // 3. Если ход вообще не в топе Maia (0%), но это отличный ход по SF (Top-4)
-      if (step.sfRank >= 1 && step.sfRank <= 4 && mProb === 0) suspicious = true;
+          // 2. Если это ход из Топ-3 движка, но человек играет его крайне редко (меньше 3%)
+          if (step.sfRank >= 2 && step.sfRank <= 3 && mProb < 3) suspicious = true;
 
-      this.history[i] = {
-        ...step,
-        maiaProb: mProb,
-        isSuspicious: suspicious
-      };
-      
-      this.history = [...this.history]; // Для реактивности
+          // 3. Если ход вообще не в топе Maia (0%), но это отличный ход по SF (Top-4)
+          if (step.sfRank >= 1 && step.sfRank <= 4 && mProb === 0) suspicious = true;
 
-    } catch (e) { console.error(e); }
+          this.history[i] = {
+            ...step,
+            maiaProb: mProb,
+            isSuspicious: suspicious
+          };
 
-    this.fullAnalysisProgress = Math.round(((i + 1) / this.history.length) * 100);
-    await new Promise(resolve => setTimeout(resolve, 10));
-  }
-  this.isFullAnalysisRunning = false;
-},
+          this.history = [...this.history]; // Для реактивности
+
+        } catch (e) { console.error(e); }
+
+        this.fullAnalysisProgress = Math.round(((i + 1) / this.history.length) * 100);
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      this.isFullAnalysisRunning = false;
+    },
 
     // Вспомогательная функция для обновления sfRank в реальном времени
     updateStepSfRank(index: number) {
@@ -193,36 +196,36 @@ export const useAnalysisStore = defineStore("analysis", {
       this.analyzeFen(this.initialFen);
     },
 
-     async calculateGameLevel() {
+    async calculateGameLevel() {
       if (this.history.length === 0) return;
-      
+
       this.isCalculatingSummary = true;
       const eloLevels = [1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900];
-      
+
       const players = {
-        w: { 
-          maiaScores: new Array(eloLevels.length).fill(0), 
-          totalLoss: 0, 
-          blunders: 0, 
-          mistakes: 0, 
+        w: {
+          maiaScores: new Array(eloLevels.length).fill(0),
+          totalLoss: 0,
+          blunders: 0,
+          mistakes: 0,
           inaccuracies: 0,
-          count: 0 
+          count: 0
         },
-        b: { 
-          maiaScores: new Array(eloLevels.length).fill(0), 
-          totalLoss: 0, 
-          blunders: 0, 
-          mistakes: 0, 
+        b: {
+          maiaScores: new Array(eloLevels.length).fill(0),
+          totalLoss: 0,
+          blunders: 0,
+          mistakes: 0,
           inaccuracies: 0,
-          count: 0 
+          count: 0
         }
       };
 
       for (let i = 0; i < this.history.length; i++) {
         const step = this.history[i];
-        const prevFen = i === 0 ? this.initialFen : this.history[i-1].fen;
+        const prevFen = i === 0 ? this.initialFen : this.history[i - 1].fen;
         const turn = prevFen.split(' ')[1] as 'w' | 'b';
-        
+
         // 1. Расчет для Maia (как было)
         if (this.maiaInstance && this.maiaStatus === 'ready') {
           const { result } = await this.maiaInstance.batchEvaluate(eloLevels.map(() => prevFen), eloLevels, eloLevels);
@@ -236,24 +239,24 @@ export const useAnalysisStore = defineStore("analysis", {
         if (step.classification === 'blunder') players[turn].blunders++;
         if (step.classification === 'mistake') players[turn].mistakes++;
         if (step.classification === 'inaccuracy') players[turn].inaccuracies++;
-        
+
         players[turn].count++;
       }
 
       const finalize = (p: typeof players.w) => {
         if (p.count === 0) return { elo: 1100, accuracy: 0, sfAccuracy: 0, blunders: 0, mistakes: 0 };
-        
+
         // Расчет ELO Maia
         const avgMaiaScores = p.maiaScores.map(s => s / p.count);
         const maxIdx = avgMaiaScores.indexOf(Math.max(...avgMaiaScores));
 
         // Формула точности Stockfish (упрощенная весовая модель)
         // Best=100%, Excellent=100%, Good=80%, Inacc=50%, Mistake=20%, Blunder=0%
-        const accuracyPoints = (p.count - p.inaccuracies - p.mistakes - p.blunders) * 100 
-                             + (p.inaccuracies * 60) 
-                             + (p.mistakes * 30)
-                             + (p.blunders * 0);
-        
+        const accuracyPoints = (p.count - p.inaccuracies - p.mistakes - p.blunders) * 100
+          + (p.inaccuracies * 60)
+          + (p.mistakes * 30)
+          + (p.blunders * 0);
+
         return {
           elo: eloLevels[maxIdx],
           accuracy: Math.round(avgMaiaScores[maxIdx] * 100), // Сходство с Maia
@@ -272,112 +275,118 @@ export const useAnalysisStore = defineStore("analysis", {
       this.showSummary = true;
     },
 
-     async runFullAnalysis() {
-  if (this.history.length === 0) return;
-  
-  this.isFullAnalysisRunning = true;
-  this.fullAnalysisProgress = 0;
+    async runFullAnalysis() {
+      if (this.history.length === 0) return;
+      await this.waitForEngine();
+      this.isFullAnalysisRunning = true;
+      this.fullAnalysisProgress = 0;
 
-  for (let i = 0; i < this.history.length; i++) {
-    if (!this.isFullAnalysisRunning) break;
+      for (let i = 0; i < this.history.length; i++) {
+        if (!this.isFullAnalysisRunning) break;
 
-    // ОПРЕДЕЛЯЕМ FEN ДО ХОДА
-    const fenBefore = i === 0 ? this.initialFen : this.history[i - 1].fen;
-    
-    // Устанавливаем доску в позицию ДО хода (чтобы пользователь видел, что анализируется)
-    this.chess.load(fenBefore);
-    this.currentStepIndex = i - 1; 
+        // ОПРЕДЕЛЯЕМ FEN ДО ХОДА
+        const fenBefore = i === 0 ? this.initialFen : this.history[i - 1].fen;
 
-    // Ждем анализа этой позиции
-    await this.analyzeStepSequentially(i, fenBefore);
-    
-    this.fullAnalysisProgress = Math.round(((i + 1) / this.history.length) * 100);
-  }
+        // Устанавливаем доску в позицию ДО хода (чтобы пользователь видел, что анализируется)
+        this.chess.load(fenBefore);
+        this.currentStepIndex = i - 1;
 
-  // В конце переходим на последний ход
-  this.goToStep(this.history.length - 1);
-  this.isFullAnalysisRunning = false;
-  await this.calculateGameLevel();
-},
+        // Ждем анализа этой позиции
+        await this.analyzeStepSequentially(i, fenBefore);
+
+        this.fullAnalysisProgress = Math.round(((i + 1) / this.history.length) * 100);
+      }
+
+      // В конце переходим на последний ход
+      this.goToStep(this.history.length - 1);
+      this.isFullAnalysisRunning = false;
+      await this.calculateGameLevel();
+    },
 
     /**
      * Вспомогательный метод: ставит движок на конкретный шаг, 
      * ждет выполнения и записывает классификацию.
      */
     async analyzeStepSequentially(index: number, fen: string) {
-  this.analyzeFen(fen); // Запускает движок
+      this.analyzeFen(fen); // Запускает движок
 
-  return new Promise<void>((resolve) => {
-    const checkInterval = setInterval(() => {
-      if (!this.isThinking) {
-        clearInterval(checkInterval);
-        if (index >= 0) {
-          this.classifyHistoryStep(index);
-        }
-        resolve();
-      }
-    }, 30);
-  });
-},
+      return new Promise<void>((resolve) => {
+        const checkInterval = setInterval(() => {
+          if (!this.isThinking) {
+            clearInterval(checkInterval);
+            if (index >= 0) {
+              this.classifyHistoryStep(index);
+            }
+            resolve();
+          }
+        }, 30);
+      });
+    },
 
     classifyHistoryStep(index: number) {
-  const step = this.history[index];
-  const prevStepFen = index === 0 ? this.initialFen : this.history[index - 1].fen;
-  
-  // turn — это тот, кто СЕЙЧАС ходит в этой позиции (т.е. автор хода step.uci)
-  const turn = prevStepFen.split(" ")[1]; 
-  const multiplier = turn === "w" ? 1 : -1;
+      const step = this.history[index];
+      const prevStepFen = index === 0 ? this.initialFen : this.history[index - 1].fen;
 
-  if (this.engineLines.length > 0) {
-    const bestLine = this.engineLines[0];
-    
-    const parseScore = (s: string): number => {
-      if (s.includes("#")) {
-        const val = parseInt(s.replace("#", ""));
-        return val > 0 ? 10000 : -10000;
+      // turn — это тот, кто СЕЙЧАС ходит в этой позиции (т.е. автор хода step.uci)
+      const turn = prevStepFen.split(" ")[1];
+      const multiplier = turn === "w" ? 1 : -1;
+
+      if (this.engineLines.length > 0) {
+        const bestLine = this.engineLines[0];
+
+        const parseScore = (s: string): number => {
+          if (s.includes("#")) {
+            const val = parseInt(s.replace("#", ""));
+            return val > 0 ? 10000 : -10000;
+          }
+          return parseFloat(s) * 100;
+        };
+
+        // Оценка лучшего хода с точки зрения игрока, который ходит
+        const bestEval = parseScore(bestLine.score) * multiplier;
+
+        // Ищем, какой ранг у нашего реального хода в текущем анализе
+        // Используем startsWith, так как PV может содержать цепочку ходов
+        const moveIndex = this.engineLines.findIndex(l => l.pv.startsWith(step.uci));
+        const sfRank = moveIndex !== -1 ? moveIndex + 1 : 0;
+
+        let classification: MoveClassification = 'inaccuracy';
+        let moveEval = 0;
+
+        if (sfRank === 1) {
+          classification = 'best';
+          moveEval = bestEval;
+        } else if (moveIndex !== -1) {
+          moveEval = parseScore(this.engineLines[moveIndex].score) * multiplier;
+          classification = classifyMove(moveEval, bestEval, bestEval);
+        } else {
+          // Хода нет в MultiPV (топ-4/8)
+          // Считаем, что он как минимум хуже худшей линии
+          const worstLine = this.engineLines[this.engineLines.length - 1];
+          const worstEval = parseScore(worstLine.score) * multiplier;
+          moveEval = worstEval - 50;
+          classification = classifyMove(moveEval, bestEval, bestEval);
+
+          // Страховка: если ход не в топе, он не может быть "лучшим"
+          if (classification === 'best' || classification === 'excellent') {
+            classification = 'inaccuracy';
+          }
+        }
+
+        // Сохраняем данные
+        this.history[index] = {
+          ...step,
+          sfRank,
+          classification
+        };
       }
-      return parseFloat(s) * 100;
-    };
+    },
 
-    // Оценка лучшего хода с точки зрения игрока, который ходит
-    const bestEval = parseScore(bestLine.score) * multiplier;
-    
-    // Ищем, какой ранг у нашего реального хода в текущем анализе
-    // Используем startsWith, так как PV может содержать цепочку ходов
-    const moveIndex = this.engineLines.findIndex(l => l.pv.startsWith(step.uci));
-    const sfRank = moveIndex !== -1 ? moveIndex + 1 : 0;
-    
-    let classification: MoveClassification = 'inaccuracy';
-    let moveEval = 0;
+    async waitForEngine() {
+      if (this.isReady) return;
+      await this.engineReadyPromise;
+    },
 
-    if (sfRank === 1) {
-      classification = 'best';
-      moveEval = bestEval;
-    } else if (moveIndex !== -1) {
-      moveEval = parseScore(this.engineLines[moveIndex].score) * multiplier;
-      classification = classifyMove(moveEval, bestEval, bestEval);
-    } else {
-      // Хода нет в MultiPV (топ-4/8)
-      // Считаем, что он как минимум хуже худшей линии
-      const worstLine = this.engineLines[this.engineLines.length - 1];
-      const worstEval = parseScore(worstLine.score) * multiplier;
-      moveEval = worstEval - 50; 
-      classification = classifyMove(moveEval, bestEval, bestEval);
-      
-      // Страховка: если ход не в топе, он не может быть "лучшим"
-      if (classification === 'best' || classification === 'excellent') {
-        classification = 'inaccuracy';
-      }
-    }
-
-    // Сохраняем данные
-    this.history[index] = {
-      ...step,
-      sfRank,
-      classification
-    };
-  }
-},
 
     async loadGameById(id: number) {
       try {
@@ -388,7 +397,7 @@ export const useAnalysisStore = defineStore("analysis", {
         // Определяем начальный FEN (если партия началась не с позиции по умолчанию)
         // Если в API нет поля initialFen, используем START_FEN
         const startFen = data.Game.initialFen || START_FEN;
-        
+
         // Мапим шаги из БД в формат стора анализа
         const historySteps = data.Steps.map((step: any) => ({
           fen: step.fen,
@@ -401,7 +410,7 @@ export const useAnalysisStore = defineStore("analysis", {
         this.initialFen = startFen;
         this.history = historySteps;
         this.orientation = data.Orientation?.toLowerCase() === "black" ? "black" : "white";
-        
+
         // Устанавливаем текущую позицию на последний ход
         if (this.history.length > 0) {
           this.currentStepIndex = this.history.length - 1;
@@ -410,12 +419,12 @@ export const useAnalysisStore = defineStore("analysis", {
           this.currentStepIndex = -1;
           this.chess.load(this.initialFen);
         }
-
+        await this.waitForEngine();
         // Запускаем движок для текущей позиции
         this.analyzeFen(this.chess.fen());
 
-        this.runFullAnalysis();
-        
+        await this.runFullAnalysis();
+
       } catch (e) {
         console.error("Failed to load game for analysis:", e);
       }
@@ -556,6 +565,11 @@ export const useAnalysisStore = defineStore("analysis", {
 
     initEngine() {
       if (this.worker) return;
+
+      this.engineReadyPromise = new Promise((resolve) => {
+        this.engineReadyResolve = resolve;
+      });
+
       this.worker = new Worker("/engines/stockfish-17/stockfish-17.js");
       this.worker.onmessage = (event) => this.parseUciOutput(event.data);
 
@@ -600,7 +614,13 @@ export const useAnalysisStore = defineStore("analysis", {
     },
 
     parseUciOutput(line: string) {
-      if (line === "readyok") this.isReady = true;
+      if (line === "readyok") {
+        this.isReady = true;
+        if (this.engineReadyResolve) {
+          this.engineReadyResolve();
+          this.engineReadyResolve = null; // Очищаем
+        }
+      }
 
       // 1. Конечный результат анализа
       if (line.startsWith("bestmove")) {
