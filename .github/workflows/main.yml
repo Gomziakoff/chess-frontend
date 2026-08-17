@@ -3,28 +3,29 @@ name: Deploy Frontend
 on:
   push:
     branches:
-      - main  # или master, в зависимости от вашей ветки
+      - main
 
 jobs:
   build-and-deploy:
-    runs-on: self-hosted  # Используем ваш установленный раннер
+    runs-on: self-hosted
 
     steps:
-      # 1. Обновляем исходный код в папке chess-frontend
+      # 1. Скачиваем код (он попадает в папку раннера)
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Пересобираем только фронтенд через docker-compose
+      # 2. Синхронизируем код из папки раннера в папку проекта
+      # Мы используем rsync, чтобы обновить только измененные файлы
+      - name: Sync files to project folder
+        run: |
+          rsync -avz --delete --exclude='.git' ./ /home/oleksiiko/chess-frontend/
+
+      # 3. Пересобираем контейнер, обращаясь к общему docker-compose
       - name: Rebuild Frontend Container
         run: |
-          # Переходим в домашнюю директорию, где лежит docker-compose.yml
           cd /home/oleksiiko
-          
-          # Пересобираем конкретный сервис (frontend)
-          # --build заставит докер заметить изменения в папке
-          # -d запустит в фоновом режиме
           docker compose up -d --build frontend
 
-      # 3. (Опционально) Очистка старых образов, чтобы не забивать диск
+      # 4. Очистка
       - name: Cleanup old images
         run: docker image prune -f
