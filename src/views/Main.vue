@@ -176,7 +176,7 @@ function openGameModal() {
 }
 
 /* Адаптивность для планшетов */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .title {
     font-size: 3rem;
   }

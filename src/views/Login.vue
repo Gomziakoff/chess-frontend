@@ -109,16 +109,21 @@ const submit = async () => {
 </template>
 
 <style scoped>
+/* Контейнер теперь имеет небольшой паддинг, чтобы форма не прилипала к краям экрана */
 .auth-container {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .auth-box {
-  width: 420px;
+  width: 100%;
+  max-width: 420px; /* Ограничиваем ширину на десктопе */
   padding: 40px 32px;
+  box-sizing: border-box;
 }
 
 .tabs {
@@ -129,17 +134,16 @@ const submit = async () => {
 }
 
 .tab {
-  font-family: Alumni Sans;
+  font-family: 'Alumni Sans', sans-serif;
   font-weight: 600;
-  font-style: SemiBold;
-  font-size: 3.75rem;
+  font-size: 3.75rem; /* 60px */
   line-height: 100%;
-  letter-spacing: 0%;
   color: rgba(255, 255, 255, 0.4);
   cursor: pointer;
   position: relative;
   display: inline-block;
-  width: fit-content;
+  white-space: nowrap;
+  transition: color 0.2s, font-size 0.2s;
 }
 
 .tab.active {
@@ -162,14 +166,10 @@ const submit = async () => {
 }
 
 .label {
-  font-family: Alumni Sans;
+  font-family: 'Alumni Sans', sans-serif;
   font-weight: 400;
-  font-style: Regular;
   font-size: 24px;
   line-height: 100%;
-  letter-spacing: 0%;
-  text-align: left;
-
   color: white;
   margin-bottom: 0.3rem;
   margin-top: 1rem;
@@ -182,6 +182,7 @@ const submit = async () => {
   background: transparent;
   color: white;
   padding: 0 12px;
+  font-size: 16px; /* Предотвращает зум на iOS при фокусе */
 }
 
 .input:focus {
@@ -190,7 +191,7 @@ const submit = async () => {
 }
 
 .button {
-  margin-top: 20px;
+  margin-top: 24px;
   height: 48px;
   border-radius: 10px;
   border: none;
@@ -198,6 +199,11 @@ const submit = async () => {
   font-size: 20px;
   font-weight: 700;
   cursor: pointer;
+  transition: background 0.2s;
+}
+
+.button:hover:not(:disabled) {
+  background: white;
 }
 
 .button:disabled {
@@ -209,21 +215,24 @@ const submit = async () => {
   margin-top: 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .checkbox {
   display: flex;
-  align-items: center;
+  align-items: flex-start; /* Чтобы текст не центрировался, если он в 2 строки */
   gap: 10px;
   font-size: 14px;
   color: rgba(255, 255, 255, 0.8);
   cursor: pointer;
+  line-height: 1.2;
 }
 
 .checkbox input {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0; /* Чтобы чекбокс не сплющивался */
+  margin-top: -2px;
 }
 
 .divider {
@@ -233,9 +242,55 @@ const submit = async () => {
 }
 
 .forgot {
-  margin-top: 12px;
+  margin-top: 16px;
   text-align: center;
   font-size: 14px;
   color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+}
+
+.forgot:hover {
+  color: white;
+}
+
+/* === АДАПТИВНОСТЬ === */
+
+@media (max-width: 480px) {
+  .auth-box {
+    padding: 20px 16px; /* Уменьшаем внутренние отступы */
+  }
+
+  .tabs {
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .tab {
+    font-size: 2.5rem; /* Уменьшаем шрифт заголовков, чтобы "Регистрация" влезла */
+  }
+
+  .label {
+    font-size: 20px;
+  }
+
+  .button {
+    height: 54px; /* На мобилках кнопки лучше делать чуть крупнее для удобства нажатия */
+    font-size: 18px;
+  }
+
+  .checkbox {
+    font-size: 13px; /* Немного уменьшаем шрифт условий */
+  }
+}
+
+/* Для совсем маленьких экранов (iPhone 5/SE или Fold) */
+@media (max-width: 360px) {
+  .tab {
+    font-size: 2rem;
+  }
+  
+  .tabs {
+    gap: 10px;
+  }
 }
 </style>
