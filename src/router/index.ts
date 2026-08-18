@@ -20,11 +20,13 @@ const routes = [
     path: "/",
     name: "Main",
     component: Main,
+    meta: { title: 'Главная - BlackPawnChess.xyz' },
   },
   {
     path: "/profile",
     name: "Profile",
     component: Profile,
+    meta: { title: 'Твой профиль' },
   },
   {
     path: "/test",
@@ -35,16 +37,19 @@ const routes = [
     path: "/analysis",
     name: "Analysis",
     component: Analysis,
+    meta: { title: 'Анализ партии' },
   },
   {
     path: "/support",
     name: "Support",
     component: SupportPage,
+    meta: { title: 'Поддержи проект' },
   },
   {
     path: "/openings",
     name: "Openings",
     component: OpeningDrill,
+    meta: { title: 'Тренировка дебютов' },
   },
   {
     path: "/lobby",
@@ -54,23 +59,27 @@ const routes = [
   {
     path: '/puzzles/:id?',
     name: 'puzzle',
-    component: () => import('../views/Puzzle.vue')
+    component: () => import('../views/Puzzle.vue'),
+    meta: { title: 'Решение задач' },
   },
   {
     path: "/game/bot",
     name: "GameBot",
     component: BotGame,
+    meta: { title: 'Игра с ботом' },
   },
   {
     path: "/bot",
     name: "Bot",
     component: HumanityAnalysis,
+    meta: { title: 'Анализ человечности игры' },
   },
   {
     path: "/game/:id",
     name: "Game",
     component: Game,
     props: true,
+    meta: { title: 'Партия' },
   },
   {
     path: "/watch/:id",
@@ -83,10 +92,12 @@ const routes = [
     name: "AnalysisId",
     component: AnalysisId,
     props: true,
+    meta: { title: 'Анализ партии' },
   },
   {
     path: "/login",
     component: Login,
+    meta: { title: 'Заходи и играй!' },
   },
   {
     path: "/:pathMatch(.*)*",
@@ -108,6 +119,14 @@ export const router = createRouter({
 
 router.beforeEach(async (to, from, next) => {
   const auth = useAuthStore();
+  const title = to.meta.title as string;
+  
+  // Если title есть, устанавливаем его, если нет — ставим заголовок по умолчанию
+  if (title) {
+    document.title = title;
+  } else {
+    document.title = 'BlackPawnChess'; // На случай, если забыли указать meta
+  }
 
   if (!auth.user) {
     await auth.fetchMe();
