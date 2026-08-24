@@ -5,6 +5,7 @@ export interface User {
   Id: number
   Username: string
   Email: string
+  IsGuest: boolean
   EloClassical: number
   EloRapid: number
   EloBlitz: number
@@ -28,6 +29,7 @@ export const useAuthStore = defineStore('auth', {
 
   getters: {
     isAuthenticated: (state) => !!state.user,
+    isGuest: (state) => !!state.user?.IsGuest
   },
 
   actions: {
@@ -41,6 +43,16 @@ export const useAuthStore = defineStore('auth', {
 
       await this.fetchMe()
       this.loading = false
+    },
+
+    async loginAsGuest() {
+        try {
+            const response = await http.post('/auth/guest');
+            this.user = response.data;
+            return true;
+        } catch (e) {
+            return false;
+        }
     },
 
     async register(username: string, email: string, password: string){

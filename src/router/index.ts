@@ -20,13 +20,13 @@ const routes = [
     path: "/",
     name: "Main",
     component: Main,
-    meta: { title: 'Главная - BlackPawnChess.xyz' },
+    meta: { title: 'Главная - BlackPawnChess.xyz'},
   },
   {
     path: "/profile",
     name: "Profile",
     component: Profile,
-    meta: { title: 'Твой профиль' },
+    meta: { title: 'Твой профиль'},
   },
   {
     path: "/test",
@@ -119,20 +119,14 @@ export const router = createRouter({
 
 router.beforeEach(async (to, from, next) => {
   const auth = useAuthStore();
-  const title = to.meta.title as string;
-  
-  // Если title есть, устанавливаем его, если нет — ставим заголовок по умолчанию
-  if (title) {
-    document.title = title;
-  } else {
-    document.title = 'BlackPawnChess'; // На случай, если забыли указать meta
-  }
+
+  document.title = to.meta.title as string || 'BlackPawnChess';
 
   if (!auth.user) {
     await auth.fetchMe();
   }
 
-  if (to.path !== "/login" && !auth.isAuthenticated) {
+  if (to.name === "Profile" && !auth.isAuthenticated) {
     return next("/login");
   }
 

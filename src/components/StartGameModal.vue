@@ -147,7 +147,7 @@ const increment = ref(0)
 const difficulty = ref("medium")
 const color = ref<"white" | "black">("white")
 
-function selectPreset(preset: any) {
+async function selectPreset(preset: any) {
     // Нажали на активную кнопку → отмена
     if (activePreset.value === preset.label) {
         socketStore.send({ t: 'stop-seek' })
@@ -159,17 +159,32 @@ function selectPreset(preset: any) {
     // Уже ищем другой режим — игнорируем
     if (isSearching.value) return
 
-    // Запуск поиска
-    socketStore.send({
-        t: 'seek',
-        d: {
-            initialTime: preset.time * 60,
-            increment: preset.increment
+   try {
+        // 1. Авторизация (если нужно)
+        if (!auth.isAuthenticated) {
+            const success = await auth.loginAsGuest();
+            if (!success) return;
         }
-    })
 
-    activePreset.value = preset.label
-    isSearching.value = true
+        // 2. ЖДЕМ подключения сокета перед отправкой данных
+        await initLobbySocket();
+
+        // 3. Теперь сокет точно готов!
+        socketStore.send({
+            t: 'seek',
+            d: {
+                initialTime: preset.time * 60,
+                increment: preset.increment
+            }
+        })
+
+        activePreset.value = preset.label
+        isSearching.value = true
+
+    } catch (err) {
+        console.error("Ошибка старта поиска:", err);
+        alert("Не удалось подключиться к серверу");
+    }
 }
 
 const onRedirect = async (payload: any) => {
@@ -207,16 +222,47 @@ function startGame() {
     }
 }
 
+function initLobbySocket(): Promise<void> {
+    return new Promise((resolve, reject) => {
+        // Если уже подключены, просто выходим
+        if (socketStore.connected) { // проверьте, как у вас называется флаг в сторе
+            resolve();
+            return;
+        }
+
+        socketStore.connect('lobby');
+        
+        // Ждем события открытия сокета
+        // Если в вашем socketStore нет события 'open', 
+        // можно использовать простой интервал для проверки готовности
+        const checkReady = setInterval(() => {
+            // Обычно в WebSocket это readyState === 1
+            if (socketStore.socket?.readyState === 1) { 
+                clearInterval(checkReady);
+                
+                // Устанавливаем коллбеки
+                socketStore.setLobbyCallback('redirect', onRedirect);
+                socketStore.setLobbyCallback('seek_stopped', onSeekStopped);
+                socketStore.setLobbyCallback('error', () => {
+                    isSearching.value = false;
+                    activePreset.value = null;
+                });
+                
+                resolve();
+            }
+        }, 50);
+
+        // Тайм-аут, чтобы не ждать вечно
+        setTimeout(() => {
+            clearInterval(checkReady);
+            reject(new Error("Socket timeout"));
+        }, 5000);
+    });
+}
+
 onMounted(() => {
     if (auth.isAuthenticated) {
-        socketStore.connect('lobby')
-        socketStore.setLobbyCallback('redirect', onRedirect)
-        socketStore.setLobbyCallback('seek_stopped', onSeekStopped)
-
-        socketStore.setLobbyCallback('error', () => {
-            isSearching.value = false
-            activePreset.value = null
-        })
+        initLobbySocket();
     }
 })
 
