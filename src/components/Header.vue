@@ -27,7 +27,7 @@
 
             <div class="auth-zone">
                 <!-- если НЕ залогинен -->
-                <a v-if="!authStore.isAuthenticated" href="/login" class="nav-link login-link">
+                <a v-if="!authStore.isAuthenticated || authStore.isGuest" href="/login" class="nav-link login-link">
                     ВХОД
                 </a>
 
